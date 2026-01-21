@@ -686,4 +686,8 @@ def test_gemini():
         return f"ERROR: {str(e)}"
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Use Render's PORT environment variable, fallback to 5000 for local development
+    port = int(os.environ.get('PORT', 5000))
+    # Disable debug mode for production
+    debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    app.run(host='0.0.0.0', port=port, debug=debug)

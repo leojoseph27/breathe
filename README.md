@@ -9,21 +9,15 @@ This is a web application that uses a trained CNN model to predict respiratory d
 - Send audio files to backend for disease prediction
 - Display prediction results with confidence scores
 - Responsive design that works on desktop and mobile devices
+- Asthma risk assessment using clinical data
+- Environmental health monitoring with Weatherstack API
+- AI-powered medical verdict generation using Google Gemini
 
-## Components
+## Deployment Options
 
-### Backend (Flask)
-- `/` - Main page serving the HTML frontend
-- `/predict` - POST endpoint to receive audio files and return predictions
+### Local Development
 
-### Frontend
-- HTML page with audio upload and playback functionality
-- CSS styling for a clean, professional appearance
-- JavaScript to handle file uploads and communicate with the backend
-
-## Setup Instructions
-
-### Option 1: Using Virtual Environment (Recommended)
+#### Option 1: Using Virtual Environment (Recommended)
 
 **On Windows:**
 1. Run the setup script:
@@ -38,7 +32,7 @@ This is a web application that uses a trained CNN model to predict respiratory d
    ./setup_venv.sh
    ```
 
-### Option 2: Manual Setup
+#### Option 2: Manual Setup
 
 1. Create and activate a virtual environment:
    ```
@@ -57,12 +51,61 @@ This is a web application that uses a trained CNN model to predict respiratory d
 
 3. Ensure you have the model file `respiratory_audio_cnn.h5` in the project root directory.
 
-4. Run the Flask application:
+4. Create a `.env` file with your API keys:
+   ```
+   GOOGLE_API_KEY=your_google_api_key_here
+   WEATHERSTACK_API_KEY=your_weatherstack_api_key_here
+   ```
+
+5. Run the Flask application:
    ```
    python app.py
    ```
 
-5. Open your browser and navigate to `http://localhost:5000` (or the IP address shown in the terminal).
+6. Open your browser and navigate to `http://localhost:5000`
+
+### Deploy to Render
+
+1. Fork this repository to your GitHub account
+2. Sign up/in to [Render](https://render.com)
+3. Click "New+" and select "Web Service"
+4. Connect your GitHub repository
+5. Configure the service:
+   - **Name**: breathe-app
+   - **Region**: Oregon (or your preference)
+   - **Branch**: main
+   - **Root Directory**: Leave empty
+   - **Environment**: Python 3
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `python app.py`
+
+6. Add environment variables in the Render dashboard:
+   - `GOOGLE_API_KEY` = your Google Gemini API key
+   - `WEATHERSTACK_API_KEY` = your Weatherstack API key
+   - `FLASK_DEBUG` = false
+
+7. Click "Create Web Service"
+
+8. Wait for the build and deployment to complete
+
+Your application will be available at `https://your-app-name.onrender.com`
+
+## Components
+
+### Backend (Flask)
+- `/` - Main page serving the HTML frontend
+- `/predict` - POST endpoint to receive audio files and return predictions
+- `/predict_asthma` - POST endpoint for asthma risk assessment
+- `/weather` - GET endpoint for weather data
+- `/generate_ai_verdict` - POST endpoint for AI medical verdict
+- `/login` and `/logout` - Authentication routes
+
+### Frontend
+- Login page with session management
+- Audio analysis interface
+- Asthma detection form
+- Environmental health monitoring
+- AI doctor consultation page
 
 ## Technical Details
 
@@ -80,8 +123,24 @@ The model takes 2.5-second audio clips with a 0.6-second offset and predicts amo
 - Healthy
 - Pneumonia
 
+## API Keys Required
+
+1. **Google Gemini API Key**
+   - Get from [Google AI Studio](https://aistudio.google.com/)
+   - Used for AI doctor medical verdict generation
+
+2. **Weatherstack API Key**
+   - Get from [Weatherstack](https://weatherstack.com/)
+   - Free tier available for basic weather data
+   - Used for environmental health monitoring
+
 ## Troubleshooting
 
 If you encounter issues with the TensorFlow model loading due to version incompatibilities, the system will fall back to a mock prediction function that returns random results from the valid classes. To resolve this permanently:
 1. Retrain and save the model with compatible versions, or
 2. Upgrade/downgrade your TensorFlow installation to match the model's version
+
+For deployment issues:
+- Check Render logs for build errors
+- Verify all environment variables are set correctly
+- Ensure model files are included in the repository
