@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asthma Monitoring System</title>
+    <style>
+        :root {
+            --portage: #957ff7;
+            --froly: #f28476;
+            --downy: #72cbd4;
+            --moon-raker: #e6def8;
+            --mine-shaft: #353535;
+            --contessa: #bf6b66;
+            --perfume: #b395f5;
+            --tradewind: #6ba8b8;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .background-shapes {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+        
+        .shape {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .shape-1 {
+            width: 300px;
+            height: 300px;
+            top: -150px;
+            left: -150px;
+        }
+        
+        .shape-2 {
+            width: 200px;
+            height: 200px;
+            bottom: -100px;
+            right: -100px;
+        }
+        
+        .shape-3 {
+            width: 150px;
+            height: 150px;
+            top: 50%;
+            left: -75px;
+        }
+        
+        .shape-4 {
+            width: 100px;
+            height: 100px;
+            bottom: 20%;
+            right: 10%;
+        }
+        
+        .shape-5 {
+            width: 80px;
+            height: 80px;
+            top: 20%;
+            right: 5%;
+        }
+        
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+        }
+        
+        .page-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--moon-raker);
+        }
+        
+        .page-title {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--mine-shaft);
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+        
+        .navigation-container {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .nav-btn {
+            display: inline-block;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            min-width: 180px;
+            text-align: center;
+        }
+        
+        .nav-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .nav-btn:first-child {
+            background: linear-gradient(135deg, var(--portage), var(--perfume));
+            color: white;
+        }
+        
+        .nav-btn:nth-child(2) {
+            background: linear-gradient(135deg, var(--downy), var(--tradewind));
+            color: white;
+        }
+        
+        .nav-btn:last-child {
+            background: linear-gradient(135deg, var(--contessa), #d48a8a);
+            color: white;
+        }
+        
+        .input-section {
+            background: var(--moon-raker);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .input-section h2 {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--mine-shaft);
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        
+        .city-input-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .city-input-group input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .city-input-group input:focus {
+            outline: none;
+            border-color: var(--portage);
+            box-shadow: 0 0 0 2px rgba(149, 127, 247, 0.1);
+        }
+        
+        .city-input-group button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, var(--portage), var(--perfume));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .city-input-group button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(149, 127, 247, 0.4);
+        }
+        
+        .refresh-btn {
+            background: linear-gradient(135deg, var(--downy), var(--tradewind));
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: block;
+            margin: 0 auto;
+            width: 200px;
+        }
+        
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(114, 203, 212, 0.4);
+        }
+        
+        .result-section {
+            background: var(--moon-raker);
+            border-radius: 15px;
+            padding: 30px;
+            display: none;
+        }
+        
+        .result-section h2 {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--mine-shaft);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .risk-indicator {
+            text-align: center;
+            margin-bottom: 25px;
+            padding: 20px;
+            border-radius: 12px;
+            font-size: 24px;
+            font-weight: 700;
+        }
+        
+        .risk-low {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            color: #155724;
+        }
+        
+        .risk-moderate {
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+            color: #856404;
+        }
+        
+        .risk-high {
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+            color: #721c24;
+        }
+        
+        .aqi-data {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .aqi-item {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .aqi-item h4 {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+        
+        .aqi-item p {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--mine-shaft);
+        }
+        
+        .advice-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        
+        .advice-section h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--mine-shaft);
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .advice-text {
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--mine-shaft);
+        }
+        
+        .weather-triggers {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--moon-raker);
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .page-title {
+                font-size: 28px;
+            }
+            
+            .city-input-group {
+                flex-direction: column;
+            }
+            
+            .aqi-data {
+                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="background-shapes">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+        <div class="shape shape-3"></div>
+        <div class="shape shape-4"></div>
+        <div class="shape shape-5"></div>
+    </div>
+    
+    <div class="container">
+        <div class="page-header">
+            <h1 class="page-title">Asthma Monitoring System</h1>
+            <p class="subtitle">Real-time air quality and weather monitoring for asthma patients with personalized health alerts</p>
+        </div>
+        
+        <div class="navigation-container">
+            <a href="/" class="nav-btn">Back to Audio Analysis</a>
+            <a href="/detection" class="nav-btn">Asthma Detection</a>
+            <a href="/ai_doctor" class="nav-btn">AI Doctor</a>
+            <a href="/logout" class="nav-btn">Logout</a>
+        </div>
+        
+        <div class="input-section">
+            <h2>Location & Monitoring</h2>
+            <div style="text-align: center;">
+                <button id="locationBtn" class="refresh-btn">
+                    Use Current Location
+                </button>
+            </div>
+        </div>
+        
+        <div id="resultSection" class="result-section">
+            <h2>Current Conditions & Health Status</h2>
+            <div id="stationInfo" style="
+                margin-bottom: 15px;
+                font-size: 14px;
+                color: #555;
+                text-align: center;
+            ">
+            </div>
+            
+            <div id="riskIndicator" class="risk-indicator risk-low">
+                LOW RISK
+            </div>
+            
+            <div class="aqi-data">
+                <div class="aqi-item">
+                    <h4>AQI</h4>
+                    <p id="aqiValue">--</p>
+                </div>
+                <div class="aqi-item">
+                    <h4>PM2.5</h4>
+                    <p id="pm25Value">--</p>
+                </div>
+                <div class="aqi-item">
+                    <h4>PM10</h4>
+                    <p id="pm10Value">--</p>
+                </div>
+                <div class="aqi-item">
+                    <h4>NO₂</h4>
+                    <p id="no2Value">--</p>
+                </div>
+                <div class="aqi-item">
+                    <h4>Temperature</h4>
+                    <p id="tempValue">--°C</p>
+                </div>
+                <div class="aqi-item">
+                    <h4>Humidity</h4>
+                    <p id="humidityValue">--%</p>
+                </div>
+                <div class="aqi-item">
+                    <h4>Weather</h4>
+                    <p id="weatherDesc">Haze</p>
+                </div>
+
+                <div class="aqi-item">
+                    <h4>Wind Speed</h4>
+                    <p id="windSpeedValue">9 km/h</p>
+                </div>
+
+                <div class="aqi-item">
+                    <h4>Rainfall</h4>
+                    <p id="precipValue">0 mm</p>
+                </div>
+            </div>
+            
+            <div class="advice-section">
+                <h3>Health Recommendations</h3>
+                <div class="advice-text" id="aqiAdvice">
+                    Enter a city name to check current air quality and health recommendations.
+                </div>
+                <div class="weather-triggers" id="weatherTriggers">
+                    <!-- Weather triggers will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const resultSection = document.getElementById('resultSection');
+        const riskIndicator = document.getElementById('riskIndicator');
+        const aqiValue = document.getElementById('aqiValue');
+        const pm25Value = document.getElementById('pm25Value');
+        const pm10Value = document.getElementById('pm10Value');
+        const no2Value = document.getElementById('no2Value');
+        const tempValue = document.getElementById('tempValue');
+        const humidityValue = document.getElementById('humidityValue');
+        const aqiAdvice = document.getElementById('aqiAdvice');
+        const weatherTriggers = document.getElementById('weatherTriggers');
+        
+        // Update UI with data
+        function updateUI(data) {
+            // Update resolved location information
+            const stationInfo = document.getElementById('stationInfo');
+            
+            if (data.resolvedLocation && data.resolvedLocation.name) {
+                stationInfo.innerHTML = `
+                    📍 <strong>Data Source Location:</strong>
+                    ${data.resolvedLocation.name}, 
+                    ${data.resolvedLocation.region}, 
+                    ${data.resolvedLocation.country}
+                    <br>
+                    <small>(Nearest available weather monitoring station)</small>
+                `;
+            } else {
+                stationInfo.innerHTML = "";
+            }
+            
+            // DOM references for new weather data
+            const weatherDesc = document.getElementById('weatherDesc');
+            const windSpeedValue = document.getElementById('windSpeedValue');
+            const precipValue = document.getElementById('precipValue');
+            
+            // Update AQI values
+            aqiValue.textContent = data.aqi;
+            pm25Value.textContent = data.pm25;
+            pm10Value.textContent = data.pm10;
+            no2Value.textContent = data.no2;
+            tempValue.textContent = `${data.temperature}°C`;
+            humidityValue.textContent = `${data.humidity}%`;
+            
+            // Weather description
+            weatherDesc.textContent = data.weatherDescription;
+            
+            // Wind speed
+            windSpeedValue.textContent = `${data.windSpeed} km/h`;
+            
+            // Rainfall
+            precipValue.textContent = `${data.precip} mm`;
+            
+            // Determine risk level and update advice
+            let riskLevel = 'low';
+            let aqiText = '';
+            
+            switch(data.epaIndex) {
+                case 1:
+                    riskLevel = 'low';
+                    aqiText = 'Air quality is good. Safe for asthma patients.';
+                    break;
+                case 2:
+                    riskLevel = 'moderate';
+                    aqiText = 'Moderate air quality. Avoid long outdoor exposure.';
+                    break;
+                case 3:
+                    riskLevel = 'moderate';
+                    aqiText = 'Unhealthy for sensitive groups. Stay indoors if possible.';
+                    break;
+                default: // EPA >= 4
+                    riskLevel = 'high';
+                    aqiText = 'Poor air quality. High asthma risk. Use inhaler and stay indoors.';
+            }
+            
+            // Update risk indicator
+            riskIndicator.className = `risk-indicator risk-${riskLevel}`;
+            riskIndicator.textContent = riskLevel.toUpperCase().replace('_', ' ') + ' RISK';
+            
+            // Update AQI advice
+            aqiAdvice.textContent = aqiText;
+            
+            // Check weather triggers
+            const triggers = [];
+            if (data.humidity > 70) {
+                triggers.push('High humidity may trigger asthma symptoms.');
+            }
+            if (data.temperature < 15) {
+                triggers.push('Cold air can cause breathing difficulty.');
+            }
+            if (data.windSpeed <= 15) {
+                triggers.push('Wind conditions are safe.');
+            } else if (data.windSpeed >= 16 && data.windSpeed <= 25) {
+                triggers.push('Moderate wind may spread dust and pollen.');
+            } else if (data.windSpeed > 25) {
+                triggers.push('High wind may significantly worsen asthma symptoms.');
+            }
+            if (data.pressure < 1000) {
+                triggers.push('Low pressure may worsen respiratory issues.');
+            }
+            if (data.cloudCover > 60) {
+                triggers.push('Pollution may remain trapped in the air.');
+            }
+            
+            // Display weather triggers
+            if (triggers.length > 0) {
+                weatherTriggers.innerHTML = '<strong>Weather Triggers:</strong><br>' + triggers.join('<br>');
+            } else {
+                weatherTriggers.innerHTML = '';
+            }
+            
+            // Show result section
+            resultSection.style.display = 'block';
+            resultSection.scrollIntoView({ behavior: 'smooth' });
+            
+            // Add disclaimer after weather triggers are displayed
+            const adviceSection = document.querySelector('.advice-section');
+            if (!document.querySelector('.disclaimer-text')) {
+                const disclaimerDiv = document.createElement('div');
+                disclaimerDiv.className = 'disclaimer-text';
+                disclaimerDiv.style.cssText = 'margin-top: 15px; text-align: center; font-size: 12px; color: #777;';
+                disclaimerDiv.innerHTML = '*Air quality data is derived from the nearest available monitoring station.*';
+                adviceSection.appendChild(disclaimerDiv);
+            }
+            
+
+        }
+        
+        // Fetch data function - removed city functionality
+        
+        // Event listeners
+        // Removed city input functionality - only using current location
+        
+        // Current location functionality
+        const locationBtn = document.getElementById("locationBtn");
+        
+        locationBtn.addEventListener("click", async () => {
+            if (!navigator.geolocation) {
+                alert("Geolocation is not supported by your browser.");
+                return;
+            }
+            
+            locationBtn.textContent = "Detecting Location...";
+            locationBtn.disabled = true;
+            
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    
+                    try {
+                        const response = await fetch(`/weather?lat=${lat}&lon=${lon}`);
+                        const data = await response.json();
+                        
+                        if (data.error) {
+                            alert(data.error.info || "Failed to fetch location data");
+                            return;
+                        }
+                        
+                        updateUI(data);
+                        
+                        // Store environmental data in session
+                        fetch('/store_environmental_data', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(data)
+                        });
+                        
+                    } catch (err) {
+                        alert("Server error while fetching location data");
+                        console.error(err);
+                    } finally {
+                        locationBtn.textContent = "Use Current Location";
+                        locationBtn.disabled = false;
+                    }
+                },
+                () => {
+                    alert("Location access denied. Please allow location access.");
+                    locationBtn.textContent = "Use Current Location";
+                    locationBtn.disabled = false;
+                }
+            );
+        });
+        
+        // Initialize with empty state
+        window.addEventListener('load', () => {
+            // Do nothing initially, wait for user to click fetch
+        });
+    </script>
+</body>
+</html>

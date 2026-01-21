@@ -1,0 +1,227 @@
+:root {
+    --portage: #957ff7;
+    --froly: #f28476;
+    --downy: #72cbd4;
+    --moon-raker: #e6def8;
+    --mine-shaft: #353535;
+    --contessa: #bf6b66;
+    --perfume: #b395f5;
+    --tradewind: #6ba8b8;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.container {
+    max-width: 800px;
+    width: 100%;
+    background: white;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    padding: 40px;
+}
+
+h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--mine-shaft);
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    font-size: 16px;
+    color: #666;
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.upload-section {
+    background: var(--moon-raker);
+    border-radius: 15px;
+    padding: 30px;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.upload-section h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--mine-shaft);
+    margin-bottom: 20px;
+}
+
+.file-display {
+    background: white;
+    border: 2px dashed var(--portage);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.file-name {
+    font-size: 16px;
+    color: var(--mine-shaft);
+    font-weight: 500;
+}
+
+.no-file {
+    color: #999;
+    font-style: italic;
+}
+
+.file-input-container {
+    position: relative;
+    display: inline-block;
+    margin-bottom: 20px;
+}
+
+.file-input-container input[type="file"] {
+    position: absolute;
+    left: 0;
+    top: 0;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+}
+
+.choose-btn {
+    background: linear-gradient(135deg, var(--portage), var(--perfume));
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.choose-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(149, 127, 247, 0.4);
+}
+
+.analyze-btn {
+    background: linear-gradient(135deg, var(--froly), var(--contessa));
+    color: white;
+    padding: 15px 40px;
+    border: none;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: block;
+    margin: 0 auto;
+    width: 200px;
+}
+
+.analyze-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(242, 132, 118, 0.4);
+}
+
+.analyze-btn:disabled {
+    background: #cccccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.result-section {
+    background: var(--moon-raker);
+    border-radius: 15px;
+    padding: 30px;
+    text-align: center;
+}
+
+.result-section h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--mine-shaft);
+    margin-bottom: 20px;
+}
+
+.disease-result {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--portage);
+    margin-bottom: 10px;
+}
+
+.confidence-result {
+    font-size: 18px;
+    color: var(--mine-shaft);
+    font-weight: 500;
+}
+
+.background-shapes {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    overflow: hidden;
+}
+
+.shape {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.shape-1 {
+    width: 300px;
+    height: 300px;
+    top: -150px;
+    left: -150px;
+}
+
+.shape-2 {
+    width: 200px;
+    height: 200px;
+    bottom: -100px;
+    right: -100px;
+}
+
+.shape-3 {
+    width: 150px;
+    height: 150px;
+    top: 50%;
+    left: -75px;
+}
+
+.shape-4 {
+    width: 100px;
+    height: 100px;
+    bottom: 20%;
+    right: 10%;
+}
+
+.shape-5 {
+    width: 80px;
+    height: 80px;
+    top: 20%;
+    right: 5%;
+}

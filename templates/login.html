@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Healthcare Login</title>
+
+    <style>
+
+        :root {
+
+            --portage: #957ff7;
+
+            --froly: #f28476;
+
+            --downy: #72cbd4;
+
+            --moon-raker: #e6def8;
+
+            --mine-shaft: #353535;
+
+            --contessa: #bf6b66;
+
+            --perfume: #b395f5;
+
+            --tradewind: #6ba8b8;
+
+        }
+
+        
+
+        * {
+
+            margin: 0;
+
+            padding: 0;
+
+            box-sizing: border-box;
+
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
+        }
+
+        
+
+        body {
+
+            background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+
+            min-height: 100vh;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            padding: 20px;
+
+        }
+
+        
+
+        .login-container {
+
+            display: flex;
+
+            max-width: 900px;
+
+            width: 100%;
+
+            background: white;
+
+            border-radius: 20px;
+
+            overflow: hidden;
+
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+
+        }
+
+        
+
+        .left-panel {
+
+            width: 40%;
+
+            background: linear-gradient(135deg, var(--portage), var(--perfume));
+
+            padding: 40px 30px;
+
+            color: white;
+
+            position: relative;
+
+            display: flex;
+
+            flex-direction: column;
+
+            justify-content: center;
+
+            align-items: center;
+
+        }
+
+        
+
+        .left-panel::before {
+
+            content: '';
+
+            position: absolute;
+
+            top: 20px;
+
+            left: 20px;
+
+            width: 10px;
+
+            height: 10px;
+
+            background: white;
+
+            border-radius: 50%;
+
+            opacity: 0.7;
+
+        }
+
+        
+
+        .left-panel::after {
+
+            content: '';
+
+            position: absolute;
+
+            top: 50px;
+
+            right: 30px;
+
+            width: 15px;
+
+            height: 15px;
+
+            background: white;
+
+            border-radius: 50%;
+
+            opacity: 0.5;
+
+        }
+
+        
+
+        .logo {
+
+            width: 120px;
+
+            height: 120px;
+
+            background: rgba(255, 255, 255, 0.2);
+
+            border-radius: 50%;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            margin-bottom: 20px;
+
+            position: relative;
+
+        }
+
+        
+
+        .logo::before {
+
+            content: '';
+
+            position: absolute;
+
+            width: 60px;
+
+            height: 60px;
+
+            background: rgba(255, 255, 255, 0.3);
+
+            border-radius: 50%;
+
+            top: -15px;
+
+            left: -15px;
+
+        }
+
+        
+
+        .logo::after {
+
+            content: '';
+
+            position: absolute;
+
+            width: 60px;
+
+            height: 60px;
+
+            background: rgba(255, 255, 255, 0.3);
+
+            border-radius: 50%;
+
+            bottom: -15px;
+
+            right: -15px;
+
+        }
+
+        
+
+        .logo-inner {
+
+            width: 40px;
+
+            height: 40px;
+
+            background: white;
+
+            border-radius: 50%;
+
+            position: relative;
+
+        }
+
+        
+
+        .logo-inner::before {
+
+            content: '';
+
+            position: absolute;
+
+            width: 30px;
+
+            height: 30px;
+
+            background: rgba(255, 255, 255, 0.5);
+
+            border-radius: 50%;
+
+            top: 5px;
+
+            left: 5px;
+
+        }
+
+        
+
+        .left-panel h1 {
+
+            font-size: 24px;
+
+            font-weight: 700;
+
+            margin-bottom: 15px;
+
+            text-transform: uppercase;
+
+            letter-spacing: 1px;
+
+        }
+
+        
+
+        .left-panel p {
+
+            font-size: 16px;
+
+            text-align: center;
+
+            line-height: 1.5;
+
+            opacity: 0.9;
+
+        }
+
+        
+
+        .right-panel {
+
+            width: 60%;
+
+            padding: 40px 50px;
+
+            display: flex;
+
+            flex-direction: column;
+
+            justify-content: center;
+
+        }
+
+        
+
+        .right-panel h2 {
+
+            font-size: 28px;
+
+            font-weight: 700;
+
+            color: var(--mine-shaft);
+
+            margin-bottom: 10px;
+
+        }
+
+        
+
+        .right-panel p {
+
+            font-size: 16px;
+
+            color: #666;
+
+            margin-bottom: 30px;
+
+        }
+
+        
+
+        .form-group {
+
+            margin-bottom: 25px;
+
+        }
+
+        
+
+        .form-group label {
+
+            display: block;
+
+            font-size: 14px;
+
+            color: #666;
+
+            margin-bottom: 8px;
+
+        }
+
+        
+
+        .form-group input {
+
+            width: 100%;
+
+            padding: 12px 15px;
+
+            border: 1px solid #ddd;
+
+            border-radius: 8px;
+
+            font-size: 16px;
+
+            transition: border-color 0.3s;
+
+        }
+
+        
+
+        .form-group input:focus {
+
+            outline: none;
+
+            border-color: var(--portage);
+
+            box-shadow: 0 0 0 2px rgba(149, 127, 247, 0.1);
+
+        }
+
+        
+
+        .forgot-password {
+
+            text-align: right;
+
+            margin-bottom: 20px;
+
+        }
+
+        
+
+        .forgot-password a {
+
+            color: var(--portage);
+
+            text-decoration: none;
+
+            font-size: 14px;
+
+            transition: color 0.3s;
+
+        }
+
+        
+
+        .forgot-password a:hover {
+
+            color: var(--perfume);
+
+            text-decoration: underline;
+
+        }
+
+        
+
+        .sign-in-btn {
+
+            width: 100%;
+
+            padding: 15px;
+
+            background: linear-gradient(135deg, var(--portage), var(--perfume));
+
+            color: white;
+
+            border: none;
+
+            border-radius: 8px;
+
+            font-size: 18px;
+
+            font-weight: 600;
+
+            cursor: pointer;
+
+            transition: all 0.3s ease;
+
+        }
+
+        
+
+        .sign-in-btn:hover {
+
+            transform: translateY(-2px);
+
+            box-shadow: 0 5px 15px rgba(149, 127, 247, 0.4);
+
+        }
+
+        
+
+        .background-shapes {
+
+            position: fixed;
+
+            top: 0;
+
+            left: 0;
+
+            width: 100%;
+
+            height: 100%;
+
+            z-index: -1;
+
+            overflow: hidden;
+
+        }
+
+        
+
+        .shape {
+
+            position: absolute;
+
+            border-radius: 50%;
+
+            background: rgba(255, 255, 255, 0.3);
+
+        }
+
+        
+
+        .shape-1 {
+
+            width: 300px;
+
+            height: 300px;
+
+            top: -150px;
+
+            left: -150px;
+
+        }
+
+        
+
+        .shape-2 {
+
+            width: 200px;
+
+            height: 200px;
+
+            bottom: -100px;
+
+            right: -100px;
+
+        }
+
+        
+
+        .shape-3 {
+
+            width: 150px;
+
+            height: 150px;
+
+            top: 50%;
+
+            left: -75px;
+
+        }
+
+        
+
+        .shape-4 {
+
+            width: 100px;
+
+            height: 100px;
+
+            bottom: 20%;
+
+            right: 10%;
+
+        }
+
+        
+
+        .shape-5 {
+
+            width: 80px;
+
+            height: 80px;
+
+            top: 20%;
+
+            right: 5%;
+
+        }
+
+        
+
+        @media (max-width: 768px) {
+
+            .login-container {
+
+                flex-direction: column;
+
+            }
+
+            
+
+            .left-panel {
+
+                width: 100%;
+
+                padding: 30px 20px;
+
+            }
+
+            
+
+            .right-panel {
+
+                width: 100%;
+
+                padding: 30px 20px;
+
+            }
+
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <div class="background-shapes">
+
+        <div class="shape shape-1"></div>
+
+        <div class="shape shape-2"></div>
+
+        <div class="shape shape-3"></div>
+
+        <div class="shape shape-4"></div>
+
+        <div class="shape shape-5"></div>
+
+    </div>
+
+    
+
+    <div class="login-container">
+
+        <div class="left-panel">
+
+            <div class="logo">
+
+                <div class="logo-inner"></div>
+
+            </div>
+
+            <h1>HEALTHCARE</h1>
+
+            <p>All your healthcare need on your finger tips</p>
+
+        </div>
+
+        
+
+        <div class="right-panel">
+
+            <h2>Welcome User</h2>
+
+            <p>Sign in to continue</p>
+
+            
+
+            <form id="loginForm">
+
+                <div class="form-group">
+
+                    <label for="email">EMAIL</label>
+
+                    <input type="email" id="email" placeholder="Enter your email" required>
+
+                </div>
+
+                
+
+                <div class="form-group">
+
+                    <label for="password">PASSWORD</label>
+
+                    <input type="password" id="password" placeholder="Enter your password" required>
+
+                </div>
+
+                
+
+                <div class="forgot-password">
+
+                    <a href="#">Forgot Password?</a>
+
+                </div>
+
+                
+
+                <button type="submit" class="sign-in-btn">SIGN IN</button>
+
+            </form>
+
+        </div>
+
+    </div>
+
+
+
+    <script>
+
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+
+            e.preventDefault();
+
+            const email = document.getElementById('email').value;
+
+            const password = document.getElementById('password').value;
+
+            
+
+            // Hardcoded credentials
+
+            if (email === 'user@gmail.com' && password === '123456') {
+
+                // Send login request to backend
+                fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Successful login - redirect to audio classification page
+                        window.location.href = '/';
+                    } else {
+                        alert(data.error || 'Login failed. Please try again.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred during login. Please try again.');
+                });
+
+            } else {
+
+                alert('Invalid email or password. Please try again.');
+
+            }
+
+        });
+
+    </script>
+
+</body>
+
+</html>

@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Doctor – Unified Respiratory Assessment</title>
+    <style>
+        :root {
+            --portage: #957ff7;
+            --froly: #f28476;
+            --downy: #72cbd4;
+            --moon-raker: #e6def8;
+            --mine-shaft: #353535;
+            --contessa: #bf6b66;
+            --perfume: #b395f5;
+            --tradewind: #6ba8b8;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .background-shapes {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+        
+        .shape {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .shape-1 {
+            width: 300px;
+            height: 300px;
+            top: -150px;
+            left: -150px;
+        }
+        
+        .shape-2 {
+            width: 200px;
+            height: 200px;
+            bottom: -100px;
+            right: -100px;
+        }
+        
+        .shape-3 {
+            width: 150px;
+            height: 150px;
+            top: 50%;
+            left: -75px;
+        }
+        
+        .shape-4 {
+            width: 100px;
+            height: 100px;
+            bottom: 20%;
+            right: 10%;
+        }
+        
+        .shape-5 {
+            width: 80px;
+            height: 80px;
+            top: 20%;
+            right: 5%;
+        }
+        
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+        }
+        
+        /* Header Section */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--moon-raker);
+        }
+        
+        .header-left {
+            flex: 1;
+        }
+        
+        .page-title {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--mine-shaft);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .page-title::before {
+            content: "🩺";
+            font-size: 24px;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .header-right {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .nav-btn {
+            display: inline-block;
+            padding: 8px 16px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            text-align: center;
+        }
+        
+        .nav-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        .logout-btn {
+            background: linear-gradient(135deg, var(--contessa), #d48a8a);
+            color: white;
+        }
+        
+        .back-btn {
+            background: linear-gradient(135deg, var(--portage), var(--perfume));
+            color: white;
+        }
+        
+        /* Patient Snapshot Card */
+        .patient-snapshot {
+            background: var(--moon-raker);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        .snapshot-item {
+            display: flex;
+            flex-direction: column;
+            min-width: 120px;
+        }
+        
+        .snapshot-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+        
+        .snapshot-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--mine-shaft);
+        }
+        
+        /* Multimodal Analysis Panels */
+        .analysis-panels {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .analysis-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border-left: 4px solid;
+        }
+        
+        .audio-card {
+            border-left-color: var(--downy);
+        }
+        
+        .clinical-card {
+            border-left-color: #28a745;
+        }
+        
+        .environmental-card {
+            border-left-color: #ffc107;
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--mine-shaft);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .card-content {
+            margin-bottom: 15px;
+        }
+        
+        .card-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+        
+        .card-label {
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .card-value {
+            font-weight: 600;
+            color: var(--mine-shaft);
+        }
+        
+        .symptoms-list {
+            margin-top: 10px;
+        }
+        
+        .symptom-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        
+        .symptom-check {
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .card-footer {
+            font-size: 13px;
+            color: #888;
+            font-style: italic;
+            padding-top: 15px;
+            border-top: 1px solid var(--moon-raker);
+        }
+        
+        /* Correlation Strip */
+        .correlation-strip {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-left: 4px solid var(--portage);
+        }
+        
+        .correlation-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--mine-shaft);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .correlation-content {
+            font-size: 15px;
+            line-height: 1.6;
+            color: var(--mine-shaft);
+        }
+        
+        .correlation-bullet {
+            margin-left: 20px;
+            margin-bottom: 8px;
+            position: relative;
+        }
+        
+        .correlation-bullet::before {
+            content: "•";
+            position: absolute;
+            left: -20px;
+            color: var(--portage);
+            font-weight: bold;
+        }
+        
+        /* Case Summary */
+        .case-summary {
+            background: var(--moon-raker);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            cursor: pointer;
+        }
+        
+        .summary-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .summary-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--mine-shaft);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .summary-content {
+            font-size: 15px;
+            line-height: 1.6;
+            color: var(--mine-shaft);
+            display: none;
+        }
+        
+        .summary-content.expanded {
+            display: block;
+        }
+        
+        /* AI Doctor Verdict */
+        .ai-verdict {
+            background: linear-gradient(135deg, #e8f4f8, #e6f7ee);
+            border-radius: 15px;
+            padding: 30px;
+            border: 2px solid #d1ecf1;
+        }
+        
+        .verdict-title {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--mine-shaft);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .verdict-title::before {
+            content: "🤖";
+            font-size: 28px;
+        }
+        
+        .verdict-content {
+            font-size: 16px;
+            line-height: 1.7;
+            color: var(--mine-shaft);
+            font-style: italic;
+        }
+        
+        .verdict-loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        .verdict-button {
+            background: linear-gradient(135deg, var(--portage), var(--perfume));
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: block;
+            margin: 20px auto 0;
+            width: 220px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .verdict-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(149, 127, 247, 0.4);
+        }
+        
+        .verdict-button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .page-header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .header-right {
+                justify-content: center;
+            }
+            
+            .analysis-panels {
+                grid-template-columns: 1fr;
+            }
+            
+            .patient-snapshot {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="background-shapes">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+        <div class="shape shape-3"></div>
+        <div class="shape shape-4"></div>
+        <div class="shape shape-5"></div>
+    </div>
+    
+    <div class="container">
+        <!-- PAGE HEADER -->
+        <div class="page-header">
+            <div class="header-left">
+                <h1 class="page-title">AI Doctor – Unified Respiratory Assessment</h1>
+                <p class="subtitle">Multimodal AI-assisted clinical decision support</p>
+            </div>
+            <div class="header-right">
+                <a href="/logout" class="nav-btn logout-btn">🔒 Logout</a>
+                <a href="/" class="nav-btn back-btn">⬅ Back to Audio Analysis</a>
+            </div>
+        </div>
+        
+        <!-- PATIENT SNAPSHOT CARD -->
+        <div class="patient-snapshot">
+            <div class="snapshot-item">
+                <span class="snapshot-label">Age</span>
+                <span class="snapshot-value" id="ageValue">--</span>
+            </div>
+            <div class="snapshot-item">
+                <span class="snapshot-label">Gender</span>
+                <span class="snapshot-value" id="genderValue">--</span>
+            </div>
+            <div class="snapshot-item">
+                <span class="snapshot-label">BMI</span>
+                <span class="snapshot-value" id="bmiValue">--</span>
+            </div>
+            <div class="snapshot-item">
+                <span class="snapshot-label">Smoking</span>
+                <span class="snapshot-value" id="smokingValue">--</span>
+            </div>
+            <div class="snapshot-item">
+                <span class="snapshot-label">Allergy</span>
+                <span class="snapshot-value" id="allergyValue">--</span>
+            </div>
+            <div class="snapshot-item">
+                <span class="snapshot-label">Family History</span>
+                <span class="snapshot-value" id="familyHistoryValue">--</span>
+            </div>
+        </div>
+        
+        <!-- MULTIMODAL ANALYSIS PANELS -->
+        <div class="analysis-panels">
+            <!-- Audio Respiratory Analysis Card -->
+            <div class="analysis-card audio-card">
+                <h3 class="card-title">🎧 Audio Respiratory Analysis</h3>
+                <div class="card-content">
+                    <div class="card-row">
+                        <span class="card-label">Detected Condition:</span>
+                        <span class="card-value" id="audioCondition">--</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Audio File:</span>
+                        <span class="card-value" id="audioFile">--</span>
+                    </div>
+                </div>
+                <div class="card-footer">AI-assisted signal analysis</div>
+            </div>
+            
+            <!-- Clinical Asthma Assessment Card -->
+            <div class="analysis-card clinical-card">
+                <h3 class="card-title">🫁 Clinical Asthma Assessment</h3>
+                <div class="card-content">
+                    <div class="card-row">
+                        <span class="card-label">Diagnosis:</span>
+                        <span class="card-value" id="asthmaDiagnosis">--</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">FEV1:</span>
+                        <span class="card-value" id="fev1Value">--</span>
+                    </div>
+                    <div class="symptoms-list" id="symptomsList">
+                        <!-- Symptoms will be populated dynamically -->
+                    </div>
+                </div>
+                <div class="card-footer">ML-based clinical inference</div>
+            </div>
+            
+            <!-- Environmental Exposure Card -->
+            <div class="analysis-card environmental-card">
+                <h3 class="card-title">🌫 Environmental Exposure</h3>
+                <div class="card-content">
+                    <div class="card-row">
+                        <span class="card-label">Location:</span>
+                        <span class="card-value" id="locationValue">--</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">AQI:</span>
+                        <span class="card-value" id="aqiValue">--</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">PM2.5:</span>
+                        <span class="card-value" id="pm25Value">--</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Weather:</span>
+                        <span class="card-value" id="weatherValue">--</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Humidity:</span>
+                        <span class="card-value" id="humidityValue">--</span>
+                    </div>
+                    <div class="card-row">
+                        <span class="card-label">Wind:</span>
+                        <span class="card-value" id="windValue">--</span>
+                    </div>
+                </div>
+                <div class="card-footer">Nearest available monitoring station</div>
+            </div>
+        </div>
+        
+        <!-- TRIGGER & SYMPTOM CORRELATION STRIP -->
+        <div class="correlation-strip">
+            <h3 class="correlation-title">🔗 Symptom–Trigger Correlation</h3>
+            <div class="correlation-content" id="correlationContent">
+                <!-- Correlation content will be populated dynamically -->
+            </div>
+        </div>
+        
+        <!-- UNIFIED CASE SUMMARY -->
+        <div class="case-summary" id="caseSummary">
+            <div class="summary-header">
+                <h3 class="summary-title">📄 Unified Case Summary (for AI reasoning)</h3>
+                <span id="expandIcon">▼</span>
+            </div>
+            <div class="summary-content" id="summaryContent">
+                <!-- Summary will be populated dynamically -->
+            </div>
+        </div>
+        
+        <!-- AI DOCTOR VERDICT -->
+        <div class="ai-verdict">
+            <h2 class="verdict-title">AI Doctor Verdict</h2>
+            <div id="verdictContent">
+                <div class="verdict-loading" id="loadingMessage">
+                    Please review all assessments and click "Generate AI Verdict" to get AI doctor's opinion.
+                </div>
+                <p class="verdict-content" id="verdictText" style="display: none;"></p>
+            </div>
+            <button class="verdict-button" id="generateVerdictBtn">Generate AI Verdict</button>
+        </div>
+    </div>
+
+    <script>
+        // Toggle case summary expansion
+        const caseSummary = document.getElementById('caseSummary');
+        const summaryContent = document.getElementById('summaryContent');
+        const expandIcon = document.getElementById('expandIcon');
+        
+        let isExpanded = false;
+        
+        caseSummary.addEventListener('click', () => {
+            isExpanded = !isExpanded;
+            if (isExpanded) {
+                summaryContent.classList.add('expanded');
+                expandIcon.textContent = '▲';
+            } else {
+                summaryContent.classList.remove('expanded');
+                expandIcon.textContent = '▼';
+            }
+        });
+        
+        // Load data from session
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                const response = await fetch('/get_patient_data');
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Populate patient snapshot
+                    document.getElementById('ageValue').textContent = data.patient_data.age || '--';
+                    document.getElementById('genderValue').textContent = data.patient_data.gender === 0 ? 'Male' : (data.patient_data.gender === 1 ? 'Female' : '--');
+                    document.getElementById('bmiValue').textContent = data.patient_data.bmi || '--';
+                    document.getElementById('smokingValue').textContent = data.patient_data.smoking === 0 ? 'Non-smoker' : (data.patient_data.smoking === 1 ? 'Former smoker' : (data.patient_data.smoking === 2 ? 'Current smoker' : '--'));
+                    document.getElementById('allergyValue').textContent = data.patient_data.allergyHistory === 0 ? 'No' : (data.patient_data.allergyHistory === 1 ? 'Yes' : '--');
+                    document.getElementById('familyHistoryValue').textContent = data.patient_data.familyHistory === 0 ? 'No' : (data.patient_data.familyHistory === 1 ? 'Yes' : '--');
+                    
+                    // Populate audio analysis
+                    document.getElementById('audioCondition').textContent = data.audio_analysis?.prediction || '--';
+                    document.getElementById('audioFile').textContent = data.audio_analysis?.filename || '--';
+                    
+                    // Populate asthma assessment
+                    document.getElementById('asthmaDiagnosis').textContent = data.asthma_assessment?.prediction || '--';
+                    document.getElementById('fev1Value').textContent = data.patient_data.lungFunctionFeV1 || '--';
+                    
+                    // Populate symptoms list
+                    const symptomsList = document.getElementById('symptomsList');
+                    symptomsList.innerHTML = '';
+                    if (data.patient_data.wheezing === 1) {
+                        const symptomItem = document.createElement('div');
+                        symptomItem.className = 'symptom-item';
+                        symptomItem.innerHTML = '<span class="symptom-check">✓</span><span>Wheezing</span>';
+                        symptomsList.appendChild(symptomItem);
+                    }
+                    if (data.patient_data.shortnessOfBreath === 1) {
+                        const symptomItem = document.createElement('div');
+                        symptomItem.className = 'symptom-item';
+                        symptomItem.innerHTML = '<span class="symptom-check">✓</span><span>Shortness of Breath</span>';
+                        symptomsList.appendChild(symptomItem);
+                    }
+                    if (data.patient_data.chestTightness === 1) {
+                        const symptomItem = document.createElement('div');
+                        symptomItem.className = 'symptom-item';
+                        symptomItem.innerHTML = '<span class="symptom-check">✓</span><span>Chest Tightness</span>';
+                        symptomsList.appendChild(symptomItem);
+                    }
+                    
+                    // Populate environmental data
+                    if (data.environmental_data) {
+                        document.getElementById('locationValue').textContent = data.environmental_data.location ? 
+                            `${data.environmental_data.location.name}, ${data.environmental_data.location.region}` : '--';
+                        document.getElementById('aqiValue').textContent = data.environmental_data.aqi ? 
+                            `Moderate (US-EPA ${data.environmental_data.epaIndex})` : '--';
+                        document.getElementById('pm25Value').textContent = data.environmental_data.pm25 ? 
+                            `${data.environmental_data.pm25} µg/m³` : '--';
+                        document.getElementById('weatherValue').textContent = data.environmental_data.weatherDescription || '--';
+                        document.getElementById('humidityValue').textContent = data.environmental_data.humidity ? 
+                            `${data.environmental_data.humidity}%` : '--';
+                        document.getElementById('windValue').textContent = data.environmental_data.windSpeed ? 
+                            `${data.environmental_data.windSpeed} km/h` : '--';
+                    }
+                    
+                    // Populate correlation strip
+                    const correlationContent = document.getElementById('correlationContent');
+                    correlationContent.innerHTML = '';
+                    
+                    if (data.environmental_data) {
+                        const epaIndex = data.environmental_data.epaIndex || 1;
+                        let pollutionText = '';
+                        if (epaIndex <= 1) {
+                            pollutionText = 'Air quality is good, unlikely to worsen respiratory symptoms';
+                        } else if (epaIndex === 2) {
+                            pollutionText = 'Moderate air pollution may contribute to respiratory symptoms';
+                        } else {
+                            pollutionText = 'Higher pollution levels may significantly worsen respiratory symptoms';
+                        }
+                        
+                        const bullet1 = document.createElement('div');
+                        bullet1.className = 'correlation-bullet';
+                        bullet1.textContent = pollutionText;
+                        correlationContent.appendChild(bullet1);
+                        
+                        if (data.environmental_data.pm25 > 25) {
+                            const bullet2 = document.createElement('div');
+                            bullet2.className = 'correlation-bullet';
+                            bullet2.textContent = `PM2.5 levels (${data.environmental_data.pm25} µg/m³) may contribute to airway irritation`;
+                            correlationContent.appendChild(bullet2);
+                        }
+                        
+                        if (data.environmental_data.windSpeed > 25) {
+                            const bullet3 = document.createElement('div');
+                            bullet3.className = 'correlation-bullet';
+                            bullet3.textContent = `High wind speeds (${data.environmental_data.windSpeed} km/h) may spread allergens and irritants`;
+                            correlationContent.appendChild(bullet3);
+                        } else {
+                            const bullet3 = document.createElement('div');
+                            bullet3.className = 'correlation-bullet';
+                            bullet3.textContent = `Wind conditions unlikely to worsen symptoms`;
+                            correlationContent.appendChild(bullet3);
+                        }
+                    }
+                    
+                    // Populate case summary
+                    const summaryText = document.getElementById('summaryContent');
+                    let summary = '';
+                    if (data.patient_data.age) {
+                        summary += `${data.patient_data.age}-year-old `;
+                    }
+                    if (data.patient_data.gender !== undefined) {
+                        summary += data.patient_data.gender === 0 ? 'male ' : 'female ';
+                    }
+                    if (data.patient_data.bmi) {
+                        summary += `with BMI ${data.patient_data.bmi}. `;
+                    }
+                    if (data.patient_data.smoking !== undefined) {
+                        const smokingStatus = data.patient_data.smoking === 0 ? 'non-smoker' : 
+                                            (data.patient_data.smoking === 1 ? 'former smoker' : 'current smoker');
+                        summary += `Smoking status: ${smokingStatus}. `;
+                    }
+                    if (data.audio_analysis?.prediction) {
+                        summary += `Audio analysis suggests ${data.audio_analysis.prediction}. `;
+                    }
+                    if (data.asthma_assessment?.prediction) {
+                        summary += `Clinical assessment indicates ${data.asthma_assessment.prediction}. `;
+                    }
+                    if (data.environmental_data) {
+                        summary += `Environmental exposure shows ${data.environmental_data.aqi ? 'moderate air quality' : 'various conditions'}. `;
+                    }
+                    summary += 'Findings suggest possible respiratory condition with environmental factors contributing to symptoms.';
+                    
+                    summaryText.textContent = summary;
+                } else {
+                    console.error('Failed to load patient data:', data.error);
+                }
+            } catch (error) {
+                console.error('Error loading patient data:', error);
+            }
+        });
+        
+        // Generate AI Verdict
+        document.getElementById('generateVerdictBtn').addEventListener('click', async function() {
+            const btn = document.getElementById('generateVerdictBtn');
+            const loadingMessage = document.getElementById('loadingMessage');
+            const verdictText = document.getElementById('verdictText');
+            
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+            loadingMessage.style.display = 'block';
+            loadingMessage.textContent = 'AI Doctor is analyzing the case...';
+            verdictText.style.display = 'none';
+            
+            try {
+                const response = await fetch('/generate_ai_verdict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    loadingMessage.style.display = 'none';
+                    verdictText.innerText = data.verdict;
+                    verdictText.style.display = 'block';
+                } else {
+                    loadingMessage.textContent = 'Error: ' + (data.error || 'Failed to generate AI verdict');
+                }
+            } catch (error) {
+                console.error('Error generating AI verdict:', error);
+                loadingMessage.textContent = 'Error: Failed to connect to AI service';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Generate AI Verdict';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Respiratory Disease Prediction</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="background-shapes">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+        <div class="shape shape-3"></div>
+        <div class="shape shape-4"></div>
+        <div class="shape shape-5"></div>
+    </div>
+    
+    <div class="container">
+        <h1>Respiratory Disease Prediction</h1>
+        <p class="subtitle">Upload an audio file to predict respiratory conditions</p>
+        
+        <div class="navigation-buttons" style="text-align: center; margin: 20px 0;">
+            <a href="/detection" class="nav-btn" style="display: inline-block; margin: 10px; padding: 12px 24px; background: linear-gradient(135deg, var(--tradewind), #87CEEB); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Asthma Detection</a>
+            <a href="/safe_check" class="nav-btn" style="display: inline-block; margin: 10px; padding: 12px 24px; background: linear-gradient(135deg, var(--portage), var(--perfume)); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Safe Check</a>
+            <a href="/ai_doctor" class="nav-btn" style="display: inline-block; margin: 10px; padding: 12px 24px; background: linear-gradient(135deg, var(--downy), var(--tradewind)); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">AI Doctor</a>
+            <a href="/logout" class="nav-btn" style="display: inline-block; margin: 10px; padding: 12px 24px; background: linear-gradient(135deg, var(--contessa), #d48a8a); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Logout</a>
+        </div>
+        
+        <div class="upload-section">
+            <h2>Upload Audio File</h2>
+            <div class="file-display">
+                <span id="fileName" class="no-file">No file chosen</span>
+            </div>
+            
+            <div class="file-input-container">
+                <button class="choose-btn">Choose Audio File</button>
+                <input type="file" id="audioFile" name="audio_file" accept=".wav,.mp3,audio/*">
+            </div>
+            
+            <button id="analyzeBtn" class="analyze-btn" disabled>Analyze Audio</button>
+        </div>
+        
+        <div id="resultSection" class="result-section" style="display: none;">
+            <h2>Prediction Result</h2>
+            <div class="disease-result">Disease: <span id="diseaseResult"></span></div>
+        </div>
+    </div>
+
+    <script>
+        const audioFileInput = document.getElementById('audioFile');
+        const fileNameDisplay = document.getElementById('fileName');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const resultSection = document.getElementById('resultSection');
+        const diseaseResult = document.getElementById('diseaseResult');
+        
+        audioFileInput.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                const fileName = e.target.files[0].name;
+                fileNameDisplay.textContent = fileName;
+                fileNameDisplay.className = 'file-name';
+                analyzeBtn.disabled = false;
+                // Hide result section when new file is selected
+                resultSection.style.display = 'none';
+            } else {
+                fileNameDisplay.textContent = 'No file chosen';
+                fileNameDisplay.className = 'no-file';
+                analyzeBtn.disabled = true;
+            }
+        });
+        
+        analyzeBtn.addEventListener('click', function() {
+            const file = audioFileInput.files[0];
+            if (!file) {
+                alert('Please select an audio file first.');
+                return;
+            }
+            
+            // Show loading state
+            analyzeBtn.textContent = 'Analyzing...';
+            analyzeBtn.disabled = true;
+            
+            const formData = new FormData();
+            formData.append('audio_file', file);
+            
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.prediction) {
+                    diseaseResult.textContent = data.prediction;
+                    resultSection.style.display = 'block';
+                    
+                    // Store audio analysis in session
+                    fetch('/store_audio_analysis', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            prediction: data.prediction,
+                            filename: file.name
+                        })
+                    });
+                } else {
+                    alert('Could not make a prediction. Please try another file.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred during prediction: ' + error.message);
+            })
+            .finally(() => {
+                analyzeBtn.textContent = 'Analyze Audio';
+                analyzeBtn.disabled = false;
+            });
+        });
+    </script>
+</body>
+</html>
