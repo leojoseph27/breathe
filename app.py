@@ -13,11 +13,14 @@ from dotenv import load_dotenv
 # Import and configure Google Generative AI
 try:
     import google.generativeai as genai
-    GENAI_AVAILABLE = True
     print("Google Generative AI library imported successfully")
 except ImportError as e:
     print(f"Google Generative AI library import failed: {e}")
+    genai = None
     GENAI_AVAILABLE = False
+    GENERATIVE_MODEL_AVAILABLE = False
+else:
+    GENAI_AVAILABLE = True
 
 # -------------------------------
 # CONFIG
@@ -530,7 +533,7 @@ def generate_ai_verdict():
     if not GENAI_AVAILABLE:
         return jsonify({
             'success': False,
-            'error': 'Google Generative AI service is not available.',
+            'error': 'Google Generative AI library not available.',
             'fallback_message': 'As an AI doctor: The AI service is currently unavailable. Please consult with a healthcare professional for proper diagnosis and treatment.'
         }), 200
     
@@ -539,6 +542,13 @@ def generate_ai_verdict():
             'success': False, 
             'error': 'Google API key not configured. Please set GOOGLE_API_KEY in .env file',
             'fallback_message': 'As an AI doctor: Please ensure proper API configuration for personalized medical advice.'
+        }), 200
+    
+    if not GENERATIVE_MODEL_AVAILABLE:
+        return jsonify({
+            'success': False,
+            'error': 'Google Generative AI service is not available.',
+            'fallback_message': 'As an AI doctor: The AI service is currently unavailable. Please consult with a healthcare professional for proper diagnosis and treatment.'
         }), 200
 
     try:
