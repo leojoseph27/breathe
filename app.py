@@ -36,17 +36,70 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 # -------------------------------
 # Load respiratory model
 try:
-    # Load the audio model with its original compilation
-    audio_model = load_model(MODEL_PATH)
-    print("CNN audio model loaded successfully!")
+    # Try loading with the original method first
+    audio_model = load_model(MODEL_PATH, compile=False)
+    print("CNN audio model loaded successfully with compile=False!")
     AUDIO_MODEL_LOADED = True
     print(f"Audio model type: {type(audio_model)}")
     print(f"Audio model has predict method: {hasattr(audio_model, 'predict')}")
 except Exception as e:
-    print(f"Error loading audio model: {e}")
-    audio_model = None
-    AUDIO_MODEL_LOADED = False
-    print("Audio model could not be loaded. Using mock prediction until fixed.")
+    print(f"Error loading audio model with compile=False: {e}")
+    print("Attempting to recreate model architecture from the notebook to handle version incompatibility...")
+    try:
+        # Recreate the model architecture as defined in the notebook
+        from tensorflow.keras.models import Model
+        from tensorflow.keras.layers import Input, Conv1D, MaxPooling1D, Dropout, Flatten, Dense, BatchNormalization
+        
+        input_shape = (162, 1)  # Based on feature extraction: 1 ZCR + 12 Chroma + 20 MFCC + 1 RMS + 128 Mel
+        inputs = Input(shape=input_shape)
+        
+        x = Conv1D(256, kernel_size=5, strides=1, padding='same', activation='relu')(inputs)
+        x = BatchNormalization()(x)
+        x = MaxPooling1D(pool_size=5, strides=2, padding='same')(x)
+        
+        x = Conv1D(256, kernel_size=5, strides=1, padding='same', activation='relu')(x)
+        x = BatchNormalization()(x)
+        x = MaxPooling1D(pool_size=5, strides=2, padding='same')(x)
+        
+        x = Conv1D(128, kernel_size=5, strides=1, padding='same', activation='relu')(x)
+        x = BatchNormalization()(x)
+        x = MaxPooling1D(pool_size=5, strides=2, padding='same')(x)
+        
+        x = Conv1D(64, kernel_size=5, strides=1, padding='same', activation='relu')(x)
+        x = BatchNormalization()(x)
+        x = MaxPooling1D(pool_size=5, strides=2, padding='same')(x)
+        
+        x = Flatten()(x)
+        x = Dense(32, activation='relu')(x)
+        x = BatchNormalization()(x)
+        x = Dropout(0.3)(x)
+        
+        outputs = Dense(len(LABEL_CLASSES), activation='softmax')(x)  # 5 classes: Bronchial, asthma, copd, healthy, pneumonia
+        
+        audio_model = Model(inputs=inputs, outputs=outputs)
+        
+        # Load only the weights
+        audio_model.load_weights(MODEL_PATH)
+        print("CNN audio model recreated and weights loaded successfully!")
+        AUDIO_MODEL_LOADED = True
+        print(f"Audio model type: {type(audio_model)}")
+        print(f"Audio model has predict method: {hasattr(audio_model, 'predict')}")
+    except Exception as architecture_error:
+        print(f"Model architecture recreation failed: {architecture_error}")
+        print("Attempting fallback loading with compile=False...")
+        try:
+            # Try the traditional approach as a fallback
+            audio_model = load_model(MODEL_PATH, compile=False)
+            print("CNN audio model loaded successfully with compile=False!")
+            AUDIO_MODEL_LOADED = True
+            print(f"Audio model type: {type(audio_model)}")
+            print(f"Audio model has predict method: {hasattr(audio_model, 'predict')}")
+        except Exception as fallback_error:
+            print(f"All loading attempts failed: {fallback_error}")
+            print("This may be due to TensorFlow/Keras version incompatibility")
+            audio_model = None
+            AUDIO_MODEL_LOADED = False
+            print("Audio model could not be loaded. Using mock prediction until fixed.")
 
 # Load asthma prediction model
 try:
