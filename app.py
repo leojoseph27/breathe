@@ -10,17 +10,16 @@ import uuid
 import joblib
 import requests
 from dotenv import load_dotenv
-# Import and configure Google Generative AI
+# Import and configure Google GenAI with the new API structure
 try:
-    import google.generativeai as genai
-    print("Google Generative AI library imported successfully")
+    from google import genai
+    GENAI_AVAILABLE = True
+    print("Google GenAI library imported successfully")
 except ImportError as e:
-    print(f"Google Generative AI library import failed: {e}")
+    print(f"Google GenAI library import failed: {e}")
     genai = None
     GENAI_AVAILABLE = False
     GENERATIVE_MODEL_AVAILABLE = False
-else:
-    GENAI_AVAILABLE = True
 
 # -------------------------------
 # CONFIG
@@ -484,16 +483,17 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
     raise ValueError("GOOGLE_API_KEY not found in environment variables")
 
-# Configure the Google Generative AI
+# Create client with the new API structure
 try:
-    genai.configure(api_key=GOOGLE_API_KEY)
-    # Test if gemini-2.5-flash model is available
-    gemini_model = genai.GenerativeModel("gemini-2.5-flash")
+    client = genai.Client(api_key=GOOGLE_API_KEY)
+    # Check if gemini-2.5-flash model is available
+    gemini_model = client.models.get(model="gemini-2.5-flash")
     GENERATIVE_MODEL_AVAILABLE = True
     print("Gemini API configured successfully with gemini-2.5-flash")
-    print("Google Generative AI is available")
+    print("New GenAI API is available")
 except Exception as e:
-    print(f"Error configuring Gemini API: {e}")
+    print(f"Error accessing gemini-2.5-flash: {e}")
+    GENAI_AVAILABLE = False
     GENERATIVE_MODEL_AVAILABLE = False
 
 @app.route('/ai_doctor')
@@ -605,8 +605,11 @@ def generate_ai_verdict():
         # Initialize the Gemini model with the new API structure
         try:
             if GENERATIVE_MODEL_AVAILABLE:
-                # Use the Google Generative AI model
-                response = gemini_model.generate_content(prompt)
+                # Use the newer GenAI API as requested
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt
+                )
                 
                 if response.text:
                     # Store the verdict in session for potential future reference
@@ -732,7 +735,10 @@ def test_gemini():
     try:
         # Use the same API key that's already loaded
         if GOOGLE_API_KEY and GENERATIVE_MODEL_AVAILABLE:
-            response = gemini_model.generate_content("Summarize asthma risk factors in 50 words.")
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents="Summarize asthma risk factors in 50 words."
+            )
             return response.text
         else:
             return "ERROR: No API key available or model not available"
