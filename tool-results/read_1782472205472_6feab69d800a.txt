@@ -1,0 +1,754 @@
+     1→     1→import os
+     2→     2→import numpy as np
+     3→     3→import librosa
+     4→     4→from flask import Flask, request, jsonify, render_template, session, redirect
+     5→     5→from werkzeug.utils import secure_filename
+     6→     6→from tensorflow.keras.models import load_model
+     7→     7→from tensorflow.keras.optimizers import Adam
+     8→     8→import tempfile
+     9→     9→import uuid
+    10→    10→import joblib
+    11→    11→import requests
+    12→    12→from dotenv import load_dotenv
+    13→    13→# Import and configure Google GenAI with the new API structure
+    14→    14→try:
+    15→    15→    from google import genai
+    16→    16→    GENAI_AVAILABLE = True
+    17→    17→    print("Google GenAI library imported successfully")
+    18→    18→except ImportError as e:
+    19→    19→    print(f"Google GenAI library import failed: {e}")
+    20→    20→    genai = None
+    21→    21→    GENAI_AVAILABLE = False
+    22→    22→    GENERATIVE_MODEL_AVAILABLE = False
+    23→    23→
+    24→    24→# -------------------------------
+    25→    25→# CONFIG
+    26→    26→# -------------------------------
+    27→    27→MODEL_PATH = "respiratory_audio_cnn.h5"
+    28→    28→ASTHMA_MODEL_PATH = "asthma_lightgbm_model.pkl"
+    29→    29→LABEL_CLASSES = ['Bronchial', 'asthma', 'copd', 'healthy', 'pneumonia']
+    30→    30→ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'flac'}
+    31→    31→
+    32→    32→app = Flask(__name__)
+    33→    33→app.secret_key = 'your-secret-key-here'  # Needed for sessions
+    34→    34→app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+    35→    35→
+    36→    36→# -------------------------------
+    37→    37→# LOAD MODELS
+    38→    38→# -------------------------------
+    39→    39→# Load respiratory model
+    40→    40→try:
+    41→    41→    # Try loading with the original method first
+    42→    42→    audio_model = load_model(MODEL_PATH, compile=False)
+    43→    43→    print("CNN audio model loaded successfully with compile=False!")
+    44→    44→    AUDIO_MODEL_LOADED = True
+    45→    45→    print(f"Audio model type: {type(audio_model)}")
+    46→    46→    print(f"Audio model has predict method: {hasattr(audio_model, 'predict')}")
+    47→    47→except Exception as e:
+    48→    48→    print(f"Error loading audio model with compile=False: {e}")
+    49→    49→    print("Attempting to recreate model architecture from the notebook to handle version incompatibility...")
+    50→    50→    try:
+    51→    51→        # Recreate the model architecture as defined in the notebook
+    52→    52→        from tensorflow.keras.models import Model
+    53→    53→        from tensorflow.keras.layers import Input, Conv1D, MaxPooling1D, Dropout, Flatten, Dense, BatchNormalization
+    54→    54→        
+    55→    55→        input_shape = (162, 1)  # Based on feature extraction: 1 ZCR + 12 Chroma + 20 MFCC + 1 RMS + 128 Mel
+    56→    56→        inputs = Input(shape=input_shape)
+    57→    57→        
+    58→    58→        x = Conv1D(256, kernel_size=5, strides=1, padding='same', activation='relu')(inputs)
+    59→    59→        x = BatchNormalization()(x)
+    60→    60→        x = MaxPooling1D(pool_size=5, strides=2, padding='same')(x)
+    61→    61→        
+    62→    62→        x = Conv1D(256, kernel_size=5, strides=1, padding='same', activation='relu')(x)
+    63→    63→        x = BatchNormalization()(x)
+    64→    64→        x = MaxPooling1D(pool_size=5, strides=2, padding='same')(x)
+    65→    65→        
+    66→    66→        x = Conv1D(128, kernel_size=5, strides=1, padding='same', activation='relu')(x)
+    67→    67→        x = BatchNormalization()(x)
+    68→    68→        x = MaxPooling1D(pool_size=5, strides=2, padding='same')(x)
+    69→    69→        
+    70→    70→        x = Conv1D(64, kernel_size=5, strides=1, padding='same', activation='relu')(x)
+    71→    71→        x = BatchNormalization()(x)
+    72→    72→        x = MaxPooling1D(pool_size=5, strides=2, padding='same')(x)
+    73→    73→        
+    74→    74→        x = Flatten()(x)
+    75→    75→        x = Dense(32, activation='relu')(x)
+    76→    76→        x = BatchNormalization()(x)
+    77→    77→        x = Dropout(0.3)(x)
+    78→    78→        
+    79→    79→        outputs = Dense(len(LABEL_CLASSES), activation='softmax')(x)  # 5 classes: Bronchial, asthma, copd, healthy, pneumonia
+    80→    80→        
+    81→    81→        audio_model = Model(inputs=inputs, outputs=outputs)
+    82→    82→        
+    83→    83→        # Load only the weights
+    84→    84→        audio_model.load_weights(MODEL_PATH)
+    85→    85→        print("CNN audio model recreated and weights loaded successfully!")
+    86→    86→        AUDIO_MODEL_LOADED = True
+    87→    87→        print(f"Audio model type: {type(audio_model)}")
+    88→    88→        print(f"Audio model has predict method: {hasattr(audio_model, 'predict')}")
+    89→    89→    except Exception as architecture_error:
+    90→    90→        print(f"Model architecture recreation failed: {architecture_error}")
+    91→    91→        print("Attempting fallback loading with compile=False...")
+    92→    92→        try:
+    93→    93→            # Try the traditional approach as a fallback
+    94→    94→            audio_model = load_model(MODEL_PATH, compile=False)
+    95→    95→            print("CNN audio model loaded successfully with compile=False!")
+    96→    96→            AUDIO_MODEL_LOADED = True
+    97→    97→            print(f"Audio model type: {type(audio_model)}")
+    98→    98→            print(f"Audio model has predict method: {hasattr(audio_model, 'predict')}")
+    99→    99→        except Exception as fallback_error:
+   100→   100→            print(f"All loading attempts failed: {fallback_error}")
+   101→   101→            print("This may be due to TensorFlow/Keras version incompatibility")
+   102→   102→            audio_model = None
+   103→   103→            AUDIO_MODEL_LOADED = False
+   104→   104→            print("Audio model could not be loaded. Using mock prediction until fixed.")
+   105→   105→
+   106→   106→# Load asthma prediction model
+   107→   107→try:
+   108→   108→    import lightgbm
+   109→   109→    print("LightGBM imported successfully")
+   110→   110→    asthma_model = joblib.load(ASTHMA_MODEL_PATH)
+   111→   111→    ASTHMA_MODEL_LOADED = True
+   112→   112→    print("Asthma LightGBM model loaded successfully!")
+   113→   113→except ImportError as ie:
+   114→   114→    print(f"ImportError: {ie}")
+   115→   115→    print("LightGBM library not available, using mock prediction")
+   116→   116→    asthma_model = None
+   117→   117→    ASTHMA_MODEL_LOADED = False
+   118→   118→except Exception as e:
+   119→   119→    print(f"Error loading asthma model: {e}")
+   120→   120→    asthma_model = None
+   121→   121→    ASTHMA_MODEL_LOADED = False
+   122→   122→
+   123→   123→# -------------------------------
+   124→   124→# HELPER FUNCTIONS
+   125→   125→# -------------------------------
+   126→   126→def allowed_file(filename):
+   127→   127→    return '.' in filename and \
+   128→   128→           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+   129→   129→
+   130→   130→def extract_features(data):
+   131→   131→    result = np.array([])
+   132→   132→
+   133→   133→    # Ensure data has sufficient length
+   134→   134→    if len(data) < 100:
+   135→   135→        # Return a default feature vector for very short audio
+   136→   136→        return np.zeros(162)  # Default size to match expected input
+   137→   137→
+   138→   138→    # Zero Crossing Rate
+   139→   139→    try:
+   140→   140→        zcr = np.mean(librosa.feature.zero_crossing_rate(data).T, axis=0)
+   141→   141→        result = np.hstack((result, zcr))
+   142→   142→    except:
+   143→   143→        result = np.hstack((result, np.zeros(1)))  # Default value if ZCR fails
+   144→   144→
+   145→   145→    # Short-time Fourier Transform and Chroma features
+   146→   146→    try:
+   147→   147→        stft = np.abs(librosa.stft(data))
+   148→   148→        # Suppress the pitch tuning warning that causes the error
+   149→   149→        import warnings
+   150→   150→        with warnings.catch_warnings():
+   151→   151→            warnings.simplefilter("ignore")
+   152→   152→            chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=22050, n_chroma=12).T, axis=0)
+   153→   153→        result = np.hstack((result, chroma))
+   154→   154→    except:
+   155→   155→        result = np.hstack((result, np.zeros(12)))  # Default 12 chroma features if it fails
+   156→   156→
+   157→   157→    # MFCC features
+   158→   158→    try:
+   159→   159→        # Suppress the pitch tuning warning that causes the error
+   160→   160→        import warnings
+   161→   161→        with warnings.catch_warnings():
+   162→   162→            warnings.simplefilter("ignore")
+   163→   163→            mfcc = np.mean(librosa.feature.mfcc(y=data, sr=22050, n_mfcc=20).T, axis=0)
+   164→   164→        result = np.hstack((result, mfcc))
+   165→   165→    except:
+   166→   166→        # If MFCC fails, add zeros as fallback
+   167→   167→        result = np.hstack((result, np.zeros(20)))  # Assuming 20 MFCC coefficients
+   168→   168→
+   169→   169→    # RMS
+   170→   170→    try:
+   171→   171→        rms = np.mean(librosa.feature.rms(y=data).T, axis=0)
+   172→   172→        result = np.hstack((result, rms))
+   173→   173→    except:
+   174→   174→        result = np.hstack((result, np.zeros(1)))  # Default value if RMS fails
+   175→   175→
+   176→   176→    # Mel spectrogram
+   177→   177→    try:
+   178→   178→        # Suppress the pitch tuning warning that causes the error
+   179→   179→        import warnings
+   180→   180→        with warnings.catch_warnings():
+   181→   181→            warnings.simplefilter("ignore")
+   182→   182→            mel = np.mean(librosa.feature.melspectrogram(y=data, sr=22050, n_mels=128).T, axis=0)
+   183→   183→        result = np.hstack((result, mel))
+   184→   184→    except:
+   185→   185→        result = np.hstack((result, np.zeros(128)))  # Default 128 mel bands if it fails
+   186→   186→
+   187→   187→    return result
+   188→   188→
+   189→   189→def preprocess_audio(audio_path):
+   190→   190→    try:
+   191→   191→        data, sr = librosa.load(audio_path, duration=2.5, offset=0.6, mono=True)
+   192→   192→        # Ensure we have enough samples to process
+   193→   193→        if len(data) < 100:
+   194→   194→            raise ValueError("Audio file too short for processing")
+   195→   195→        features = extract_features(data)
+   196→   196→        features = features.reshape(1, -1)
+   197→   197→        features = np.expand_dims(features, axis=2)
+   198→   198→        return features
+   199→   199→    except Exception as e:
+   200→   200→        print(f"Error preprocessing audio: {e}")
+   201→   201→        # Return a dummy feature vector to avoid crashes
+   202→   202→        dummy_features = np.zeros((1, 162, 1))  # Shape matches model expectation
+   203→   203→        return dummy_features
+   204→   204→
+   205→   205→def predict_disease(audio_path):
+   206→   206→    global audio_model, AUDIO_MODEL_LOADED  # Ensure we're using the global audio_model
+   207→   207→    
+   208→   208→    if AUDIO_MODEL_LOADED:
+   209→   209→        features = preprocess_audio(audio_path)
+   210→   210→        # Check if features are all zeros (indicating an error in preprocessing)
+   211→   211→        if np.all(features == 0):
+   212→   212→            print("Warning: Audio preprocessing failed, returning mock prediction")
+   213→   213→            return "Healthy", 0.5  # Return a default prediction
+   214→   214→        
+   215→   215→        # Debug: Print shape of features and model info
+   216→   216→        print(f"Features shape: {features.shape}")
+   217→   217→        print(f"Audio model type: {type(audio_model)}")
+   218→   218→        print(f"Audio model has predict method: {hasattr(audio_model, 'predict')}")
+   219→   219→        print(f"AUDIO_MODEL_LOADED status: {AUDIO_MODEL_LOADED}")
+   220→   220→        
+   221→   221→        # Make prediction using the CNN model
+   222→   222→        try:
+   223→   223→            if hasattr(audio_model, 'predict'):
+   224→   224→                probs = audio_model.predict(features)
+   225→   225→                print(f"Prediction probabilities: {probs}")
+   226→   226→                class_idx = np.argmax(probs)
+   227→   227→                confidence = np.max(probs)
+   228→   228→                result = LABEL_CLASSES[class_idx]
+   229→   229→                print(f"Predicted class: {result} with confidence: {confidence}")
+   230→   230→                return result, confidence
+   231→   231→            else:
+   232→   232→                print("Audio model does not have predict method")
+   233→   233→                return "Healthy", 0.5
+   234→   234→        except Exception as e:
+   235→   235→            print(f"Error during model prediction: {e}")
+   236→   236→            # Return a default prediction if model prediction fails
+   237→   237→            return "Healthy", 0.5
+   238→   238→    else:
+   239→   239→        print("Audio model weights could not be loaded due to version incompatibility.")
+   240→   240→        return "Model Error - Version Incompatible", 0.0
+   241→   241→
+   242→   242→def predict_asthma(features_dict):
+   243→   243→    if not ASTHMA_MODEL_LOADED:
+   244→   244→        print("Error: Asthma model not loaded")
+   245→   245→        return None, 0
+   246→   246→    
+   247→   247→    # Convert features to array in the same order as training
+   248→   248→    feature_order = [
+   249→   249→        'age', 'gender', 'bmi', 'smoking', 'familyHistory', 
+   250→   250→        'allergyHistory', 'lungFunctionFeV1', 'wheezing', 
+   251→   251→        'shortnessOfBreath', 'chestTightness'
+   252→   252→    ]
+   253→   253→    
+   254→   254→    try:
+   255→   255→        # Create feature array
+   256→   256→        features = np.array([[features_dict[key] for key in feature_order]])
+   257→   257→        
+   258→   258→        # Get prediction and probability
+   259→   259→        prediction = asthma_model.predict(features)[0]
+   260→   260→        probabilities = asthma_model.predict_proba(features)[0]
+   261→   261→        confidence = max(probabilities) * 100
+   262→   262→        
+   263→   263→        return int(prediction), round(confidence, 2)
+   264→   264→    except Exception as e:
+   265→   265→        print(f"Error in asthma prediction: {e}")
+   266→   266→        return None, 0
+   267→   267→
+   268→   268→# -------------------------------
+   269→   269→# ROUTES
+   270→   270→# -------------------------------
+   271→   271→@app.route('/')
+   272→   272→def index():
+   273→   273→    # Check if user is logged in
+   274→   274→    if 'logged_in' not in session:
+   275→   275→        return render_template('login.html')
+   276→   276→    return render_template('index.html')
+   277→   277→
+   278→   278→@app.route('/detection')
+   279→   279→def detection():
+   280→   280→    # Check if user is logged in
+   281→   281→    if 'logged_in' not in session:
+   282→   282→        return render_template('login.html')
+   283→   283→    return render_template('detection.html')
+   284→   284→
+   285→   285→@app.route('/safe_check')
+   286→   286→def safe_check():
+   287→   287→    # Check if user is logged in
+   288→   288→    if 'logged_in' not in session:
+   289→   289→        return render_template('login.html')
+   290→   290→    return render_template('safe_check.html')
+   291→   291→
+   292→   292→@app.route('/login', methods=['GET', 'POST'])
+   293→   293→def login():
+   294→   294→    if request.method == 'POST':
+   295→   295→        email = request.form['email']
+   296→   296→        password = request.form['password']
+   297→   297→        
+   298→   298→        # Hardcoded credentials
+   299→   299→        if email == 'user@gmail.com' and password == '123456':
+   300→   300→            session['logged_in'] = True
+   301→   301→            return jsonify({'success': True})
+   302→   302→        else:
+   303→   303→            return jsonify({'success': False, 'error': 'Invalid email or password'})
+   304→   304→    
+   305→   305→    return render_template('login.html')
+   306→   306→
+   307→   307→@app.route('/logout')
+   308→   308→def logout():
+   309→   309→    session.pop('logged_in', None)
+   310→   310→    return redirect('/')
+   311→   311→
+   312→   312→@app.route('/predict', methods=['POST'])
+   313→   313→def predict():
+   314→   314→    # Check if user is logged in
+   315→   315→    if 'logged_in' not in session:
+   316→   316→        return jsonify({'error': 'Authentication required'}), 401
+   317→   317→    
+   318→   318→    if 'audio_file' not in request.files:
+   319→   319→        return jsonify({'error': 'No audio file provided'}), 400
+   320→   320→    
+   321→   321→    file = request.files['audio_file']
+   322→   322→    
+   323→   323→    if file.filename == '':
+   324→   324→        return jsonify({'error': 'No file selected'}), 400
+   325→   325→    
+   326→   326→    if file and allowed_file(file.filename):
+   327→   327→        try:
+   328→   328→            # Save uploaded file temporarily
+   329→   329→            filename = secure_filename(file.filename)
+   330→   330→            temp_dir = tempfile.gettempdir()
+   331→   331→            temp_filename = f"{uuid.uuid4()}_{filename}"
+   332→   332→            filepath = os.path.join(temp_dir, temp_filename)
+   333→   333→            
+   334→   334→            file.save(filepath)
+   335→   335→            
+   336→   336→            # Make prediction
+   337→   337→            if not AUDIO_MODEL_LOADED:
+   338→   338→                print("Warning: Audio model not loaded due to version incompatibility, cannot make accurate predictions")
+   339→   339→                
+   340→   340→            pred, conf = predict_disease(filepath)
+   341→   341→            
+   342→   342→            # Check if it's an error condition
+   343→   343→            if pred == "Model Error - Version Incompatible":
+   344→   344→                return jsonify({
+   345→   345→                    'error': 'Model could not be loaded due to version incompatibility. The model file was saved with a different version of Keras/TensorFlow. Please use a compatible version or re-save the model.',
+   346→   346→                    'prediction': None,
+   347→   347→                    'confidence': None
+   348→   348→                }), 500
+   349→   349→            
+   350→   350→            # Clean up temporary file
+   351→   351→            os.remove(filepath)
+   352→   352→            
+   353→   353→            return jsonify({
+   354→   354→                'prediction': pred
+   355→   355→            })
+   356→   356→        except Exception as e:
+   357→   357→            return jsonify({'error': f'Error processing audio: {str(e)}'}), 500
+   358→   358→    else:
+   359→   359→        return jsonify({'error': 'Invalid file type. Please upload a WAV, MP3, M4A, or FLAC file.'}), 400
+   360→   360→
+   361→   361→@app.route('/predict_asthma', methods=['POST'])
+   362→   362→def predict_asthma_route():
+   363→   363→    # Check if user is logged in
+   364→   364→    if 'logged_in' not in session:
+   365→   365→        return jsonify({'error': 'Authentication required'}), 401
+   366→   366→    
+   367→   367→    try:
+   368→   368→        # Get JSON data
+   369→   369→        data = request.get_json()
+   370→   370→        
+   371→   371→        # Validate required fields
+   372→   372→        required_fields = ['age', 'gender', 'bmi', 'smoking', 'familyHistory', 
+   373→   373→                          'allergyHistory', 'lungFunctionFeV1', 'wheezing', 
+   374→   374→                          'shortnessOfBreath', 'chestTightness']
+   375→   375→        
+   376→   376→        for field in required_fields:
+   377→   377→            if field not in data:
+   378→   378→                return jsonify({'error': f'Missing required field: {field}'}), 400
+   379→   379→        
+   380→   380→        # Make asthma prediction
+   381→   381→        prediction, confidence = predict_asthma(data)
+   382→   382→        
+   383→   383→        if prediction is None:
+   384→   384→            return jsonify({'error': 'Asthma model not loaded or prediction failed'}), 500
+   385→   385→        
+   386→   386→        return jsonify({
+   387→   387→            'prediction': prediction,
+   388→   388→            'confidence': confidence
+   389→   389→        })
+   390→   390→        
+   391→   391→    except Exception as e:
+   392→   392→        return jsonify({'error': f'Error processing asthma prediction: {str(e)}'}), 500
+   393→   393→
+   394→   394→# Load environment variables and API key
+   395→   395→load_dotenv()
+   396→   396→API_KEY = os.getenv("WEATHERSTACK_API_KEY")
+   397→   397→BASE_URL = "http://api.weatherstack.com/current"  # ✅ HTTP ONLY for free plan
+   398→   398→
+   399→   399→@app.route('/weather', methods=['GET'])
+   400→   400→def get_weather():
+   401→   401→    # Check if user is logged in
+   402→   402→    if 'logged_in' not in session:
+   403→   403→        return jsonify({'error': 'Authentication required'}), 401
+   404→   404→    
+   405→   405→    city = request.args.get('city')
+   406→   406→    lat = request.args.get('lat')
+   407→   407→    lon = request.args.get('lon')
+   408→   408→    
+   409→   409→    if city:
+   410→   410→        query = city
+   411→   411→    elif lat and lon:
+   412→   412→        query = f"{lat},{lon}"
+   413→   413→    else:
+   414→   414→        return jsonify({'error': 'City or coordinates required'}), 400
+   415→   415→    
+   416→   416→    if not API_KEY:
+   417→   417→        return jsonify({'error': 'Weather API key not configured. Please set WEATHERSTACK_API_KEY in .env file'}), 500
+   418→   418→    
+   419→   419→    params = {
+   420→   420→        'access_key': API_KEY,
+   421→   421→        'query': query,
+   422→   422→        'units': 'm'
+   423→   423→    }
+   424→   424→    
+   425→   425→    try:
+   426→   426→        response = requests.get(BASE_URL, params=params)
+   427→   427→        data = response.json()
+   428→   428→        
+   429→   429→        # 🔍 DEBUG PRINT (VERY IMPORTANT)
+   430→   430→        print("Weatherstack response:", data)
+   431→   431→        
+   432→   432→        # ❌ Weatherstack error
+   433→   433→        if "error" in data:
+   434→   434→            return jsonify({
+   435→   435→                "error": data["error"]
+   436→   436→            }), 400
+   437→   437→        
+   438→   438→        location = data.get('location', {})
+   439→   439→        current = data['current']
+   440→   440→        air = current.get('air_quality', {})
+   441→   441→        
+   442→   442→        result = {
+   443→   443→            # 🔹 Resolved station / location info
+   444→   444→            'resolvedLocation': {
+   445→   445→                'name': location.get('name'),
+   446→   446→                'region': location.get('region'),
+   447→   447→                'country': location.get('country'),
+   448→   448→                'lat': location.get('lat'),
+   449→   449→                'lon': location.get('lon')
+   450→   450→            },
+   451→   451→            
+   452→   452→            # 🔹 Weather + AQI data
+   453→   453→            'temperature': current['temperature'],
+   454→   454→            'humidity': current['humidity'],
+   455→   455→            'windSpeed': current['wind_speed'],
+   456→   456→            'pressure': current['pressure'],
+   457→   457→            'cloudCover': current['cloudcover'],
+   458→   458→            'precip': current['precip'],
+   459→   459→            
+   460→   460→            'weatherDescription': current['weather_descriptions'][0] if current.get('weather_descriptions') else 'Clear',
+   461→   461→            
+   462→   462→            'pm25': float(air.get('pm2_5', 0)),
+   463→   463→            'pm10': float(air.get('pm10', 0)),
+   464→   464→            'no2': float(air.get('no2', 0)),
+   465→   465→            'so2': float(air.get('so2', 0)),
+   466→   466→            'o3': float(air.get('o3', 0)),
+   467→   467→            'co': float(air.get('co', 0)),
+   468→   468→            
+   469→   469→            'aqi': int(max(air.get('us-epa-index', 1))),
+   470→   470→            'epaIndex': int(air.get('us-epa-index', 1))
+   471→   471→        }
+   472→   472→        
+   473→   473→        return jsonify(result)
+   474→   474→    
+   475→   475→    except Exception as e:
+   476→   476→        return jsonify({'error': str(e)}), 500
+   477→   477→
+   478→   478→
+   479→   479→# Configure Gemini API
+   480→   480→load_dotenv()
+   481→   481→
+   482→   482→GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+   483→   483→if not GOOGLE_API_KEY:
+   484→   484→    raise ValueError("GOOGLE_API_KEY not found in environment variables")
+   485→   485→
+   486→   486→# Create client with the new API structure
+   487→   487→try:
+   488→   488→    client = genai.Client(api_key=GOOGLE_API_KEY)
+   489→   489→    # Check if gemini-2.5-flash model is available
+   490→   490→    gemini_model = client.models.get(model="gemini-3.1-flash-lite-preview")
+   491→   491→    GENERATIVE_MODEL_AVAILABLE = True
+   492→   492→    print("Gemini API configured successfully with gemini-3.1-flash-lite-preview")
+   493→   493→    print("New GenAI API is available")
+   494→   494→except Exception as e:
+   495→   495→    print(f"Error accessing gemini-3.1-flash-lite-preview: {e}")
+   496→   496→    GENAI_AVAILABLE = False
+   497→   497→    GENERATIVE_MODEL_AVAILABLE = False
+   498→   498→
+   499→   499→@app.route('/ai_doctor')
+   500→   500→def ai_doctor():
+   501→   501→    # Check if user is logged in
+   502→   502→    if 'logged_in' not in session:
+   503→   503→        return render_template('login.html')
+   504→   504→    return render_template('ai_doctor.html')
+   505→   505→
+   506→   506→@app.route('/get_patient_data')
+   507→   507→def get_patient_data():
+   508→   508→    # Check if user is logged in
+   509→   509→    if 'logged_in' not in session:
+   510→   510→        return jsonify({'success': False, 'error': 'Authentication required'}), 401
+   511→   511→
+   512→   512→    # Get patient data from session and stored predictions
+   513→   513→    patient_data = session.get('patient_data', {})
+   514→   514→    audio_analysis = session.get('audio_analysis', {})
+   515→   515→    asthma_assessment = session.get('asthma_assessment', {})
+   516→   516→    environmental_data = session.get('environmental_data', {})
+   517→   517→
+   518→   518→    return jsonify({
+   519→   519→        'success': True,
+   520→   520→        'patient_data': patient_data,
+   521→   521→        'audio_analysis': audio_analysis,
+   522→   522→        'asthma_assessment': asthma_assessment,
+   523→   523→        'environmental_data': environmental_data
+   524→   524→    })
+   525→   525→
+   526→   526→@app.route('/generate_ai_verdict', methods=['POST'])
+   527→   527→def generate_ai_verdict():
+   528→   528→    # Check if user is logged in
+   529→   529→    if 'logged_in' not in session:
+   530→   530→        return jsonify({'success': False, 'error': 'Authentication required'}), 401
+   531→   531→
+   532→   532→    # Check if genai is available
+   533→   533→    if not GENAI_AVAILABLE:
+   534→   534→        return jsonify({
+   535→   535→            'success': False,
+   536→   536→            'error': 'Google Generative AI library not available.',
+   537→   537→            'fallback_message': 'As an AI doctor: The AI service is currently unavailable. Please consult with a healthcare professional for proper diagnosis and treatment.'
+   538→   538→        }), 200
+   539→   539→    
+   540→   540→    if not GOOGLE_API_KEY:
+   541→   541→        return jsonify({
+   542→   542→            'success': False, 
+   543→   543→            'error': 'Google API key not configured. Please set GOOGLE_API_KEY in .env file',
+   544→   544→            'fallback_message': 'As an AI doctor: Please ensure proper API configuration for personalized medical advice.'
+   545→   545→        }), 200
+   546→   546→    
+   547→   547→    if not GENERATIVE_MODEL_AVAILABLE:
+   548→   548→        return jsonify({
+   549→   549→            'success': False,
+   550→   550→            'error': 'Google Generative AI service is not available.',
+   551→   551→            'fallback_message': 'As an AI doctor: The AI service is currently unavailable. Please consult with a healthcare professional for proper diagnosis and treatment.'
+   552→   552→        }), 200
+   553→   553→
+   554→   554→    try:
+   555→   555→        # Get patient data from session
+   556→   556→        patient_data = session.get('patient_data', {})
+   557→   557→        audio_analysis = session.get('audio_analysis', {})
+   558→   558→        asthma_assessment = session.get('asthma_assessment', {})
+   559→   559→        environmental_data = session.get('environmental_data', {})
+   560→   560→
+   561→   561→        # Prepare the prompt for the AI doctor
+   562→   562→        prompt = f"""
+   563→   563→        As an AI doctor specializing in respiratory medicine, please provide a comprehensive medical verdict based on the following patient data:
+   564→   564→
+   565→   565→        PATIENT DEMOGRAPHICS & CLINICAL DATA:
+   566→   566→        - Age: {patient_data.get('age', 'N/A')}
+   567→   567→        - Gender: {patient_data.get('gender', 'N/A')}
+   568→   568→        - BMI: {patient_data.get('bmi', 'N/A')}
+   569→   569→        - Smoking Status: {patient_data.get('smoking', 'N/A')}
+   570→   570→        - Family History of Asthma: {patient_data.get('familyHistory', 'N/A')}
+   571→   571→        - Allergy History: {patient_data.get('allergyHistory', 'N/A')}
+   572→   572→        - Lung Function (FEV1): {patient_data.get('lungFunctionFeV1', 'N/A')}%
+   573→   573→        - Wheezing: {patient_data.get('wheezing', 'N/A')}
+   574→   574→        - Shortness of Breath: {patient_data.get('shortnessOfBreath', 'N/A')}
+   575→   575→        - Chest Tightness: {patient_data.get('chestTightness', 'N/A')}
+   576→   576→
+   577→   577→        AUDIO RESPIRATORY ANALYSIS:
+   578→   578→        - Detected Condition: {audio_analysis.get('prediction', 'N/A')}
+   579→   579→
+   580→   580→        CLINICAL ASTHMA ASSESSMENT:
+   581→   581→        - Diagnosis: {asthma_assessment.get('prediction', 'N/A')}
+   582→   582→
+   583→   583→        ENVIRONMENTAL EXPOSURE DATA:
+   584→   584→        - Location: {environmental_data.get('resolvedLocation', {}).get('name', 'N/A')}, {environmental_data.get('resolvedLocation', {}).get('region', 'N/A')}
+   585→   585→        - AQI: {environmental_data.get('aqi', 'N/A')} (EPA Index: {environmental_data.get('epaIndex', 'N/A')})
+   586→   586→        - PM2.5: {environmental_data.get('pm25', 'N/A')} µg/m³
+   587→   587→        - Weather: {environmental_data.get('weatherDescription', 'N/A')}
+   588→   588→        - Humidity: {environmental_data.get('humidity', 'N/A')}%
+   589→   589→        - Wind Speed: {environmental_data.get('windSpeed', 'N/A')} km/h
+   590→   590→
+   591→   591→        Based on this comprehensive multimodal assessment, please provide a detailed medical verdict including:
+   592→   592→        1. Primary diagnosis consideration
+   593→   593→        2. Contributing factors (environmental, clinical, demographic)
+   594→   594→        3. Risk assessment
+   595→   595→        4. Recommended next steps for the patient
+   596→   596→        5. Any urgent concerns that require immediate attention
+   597→   597→
+   598→   598→        Please frame your response as if you're communicating directly with the patient, using clear but professional language. Keep your response concise but comprehensive, approximately 150-200 words.
+   599→   599→        
+   600→   600→        Return the response as clean plain text.
+   601→   601→        Do not use HTML tags or Markdown.
+   602→   602→        Use paragraphs separated by line breaks only.
+   603→   603→        """
+   604→   604→
+   605→   605→        # Initialize the Gemini model with the new API structure
+   606→   606→        try:
+   607→   607→            if GENERATIVE_MODEL_AVAILABLE:
+   608→   608→                # Use the newer GenAI API as requested
+   609→   609→                response = client.models.generate_content(
+   610→   610→                    model="gemini-2.5-flash",
+   611→   611→                    contents=prompt
+   612→   612→                )
+   613→   613→                
+   614→   614→                if response.text:
+   615→   615→                    # Store the verdict in session for potential future reference
+   616→   616→                    session['ai_verdict'] = response.text
+   617→   617→                    
+   618→   618→                    return jsonify({
+   619→   619→                        'success': True,
+   620→   620→                        'verdict': response.text
+   621→   621→                    })
+   622→   622→            else:
+   623→   623→                # Fallback if model is not available
+   624→   624→                fallback_verdict = (
+   625→   625→                    "Based on the comprehensive assessment including audio analysis, clinical data, "
+   626→   626→                    "and environmental factors: The patient shows signs that warrant medical attention. "
+   627→   627→                    "Please consult with a healthcare professional for proper evaluation and guidance. "
+   628→   628→                    "Consider avoiding known triggers and monitor symptoms closely."
+   629→   629→                )
+   630→   630→                session['ai_verdict'] = fallback_verdict
+   631→   631→                return jsonify({
+   632→   632→                    'success': True,
+   633→   633→                    'verdict': fallback_verdict,
+   634→   634→                    'source': 'fallback'
+   635→   635→                })
+   636→   636→        except Exception as e:
+   637→   637→            # Handle any runtime errors in AI processing
+   638→   638→            print(f"Error during AI processing: {e}")
+   639→   639→            # Check if it's an authentication/model error and provide more specific fallback
+   640→   640→            error_str = str(e)
+   641→   641→            if "404" in error_str or "not found" in error_str.lower():
+   642→   642→                # Model not found or not accessible - provide helpful fallback
+   643→   643→                fallback_verdict = (
+   644→   644→                    "Based on the comprehensive assessment including audio analysis, clinical data, "
+   645→   645→                    "and environmental factors: The patient shows signs that warrant medical attention. "
+   646→   646→                    "Please consult with a healthcare professional for proper evaluation and guidance. "
+   647→   647→                    "Consider avoiding known triggers and monitor symptoms closely."
+   648→   648→                )
+   649→   649→                session['ai_verdict'] = fallback_verdict
+   650→   650→                return jsonify({
+   651→   651→                    'success': True,
+   652→   652→                    'verdict': fallback_verdict,
+   653→   653→                    'source': 'fallback'
+   654→   654→                })
+   655→   655→            else:
+   656→   656→                return jsonify({
+   657→   657→                    'success': False,
+   658→   658→                    'error': f'Error processing AI request: {str(e)}',
+   659→   659→                    'fallback_message': 'As an AI doctor: Due to a processing issue, please consult with a healthcare professional for personalized medical advice.'
+   660→   660→                }), 200
+   661→   661→        
+   662→   662→        # Fallback if AI doesn't return a proper response
+   663→   663→        return jsonify({
+   664→   664→            'success': False,
+   665→   665→            'error': 'AI did not return a verdict',
+   666→   666→            'fallback_message': 'As an AI doctor: Based on your data, please consult with a healthcare professional for proper evaluation.'
+   667→   667→        }), 200
+   668→   668→
+   669→   669→    except Exception as e:
+   670→   670→        print(f"Error generating AI verdict: {e}")
+   671→   671→        return jsonify({
+   672→   672→            'success': False,
+   673→   673→            'error': f'Error generating AI verdict: {str(e)}'
+   674→   674→        })
+   675→   675→
+   676→   676→@app.route('/store_patient_data', methods=['POST'])
+   677→   677→def store_patient_data():
+   678→   678→    # Check if user is logged in
+   679→   679→    if 'logged_in' not in session:
+   680→   680→        return jsonify({'success': False, 'error': 'Authentication required'}), 401
+   681→   681→
+   682→   682→    try:
+   683→   683→        data = request.get_json()
+   684→   684→        # Store patient data in session
+   685→   685→        session['patient_data'] = data
+   686→   686→        return jsonify({'success': True})
+   687→   687→    except Exception as e:
+   688→   688→        return jsonify({'success': False, 'error': str(e)})
+   689→   689→
+   690→   690→@app.route('/store_asthma_assessment', methods=['POST'])
+   691→   691→def store_asthma_assessment():
+   692→   692→    # Check if user is logged in
+   693→   693→    if 'logged_in' not in session:
+   694→   694→        return jsonify({'success': False, 'error': 'Authentication required'}), 401
+   695→   695→
+   696→   696→    try:
+   697→   697→        data = request.get_json()
+   698→   698→        # Store asthma assessment in session
+   699→   699→        session['asthma_assessment'] = data
+   700→   700→        return jsonify({'success': True})
+   701→   701→    except Exception as e:
+   702→   702→        return jsonify({'success': False, 'error': str(e)})
+   703→   703→
+   704→   704→@app.route('/store_audio_analysis', methods=['POST'])
+   705→   705→def store_audio_analysis():
+   706→   706→    # Check if user is logged in
+   707→   707→    if 'logged_in' not in session:
+   708→   708→        return jsonify({'success': False, 'error': 'Authentication required'}), 401
+   709→   709→
+   710→   710→    try:
+   711→   711→        data = request.get_json()
+   712→   712→        # Store audio analysis in session
+   713→   713→        session['audio_analysis'] = data
+   714→   714→        return jsonify({'success': True})
+   715→   715→    except Exception as e:
+   716→   716→        return jsonify({'success': False, 'error': str(e)})
+   717→   717→
+   718→   718→@app.route('/store_environmental_data', methods=['POST'])
+   719→   719→def store_environmental_data():
+   720→   720→    # Check if user is logged in
+   721→   721→    if 'logged_in' not in session:
+   722→   722→        return jsonify({'success': False, 'error': 'Authentication required'}), 401
+   723→   723→
+   724→   724→    try:
+   725→   725→        data = request.get_json()
+   726→   726→        # Store environmental data in session
+   727→   727→        session['environmental_data'] = data
+   728→   728→        return jsonify({'success': True})
+   729→   729→    except Exception as e:
+   730→   730→        return jsonify({'success': False, 'error': str(e)})
+   731→   731→
+   732→   732→# Test route for Gemini API
+   733→   733→@app.route('/test_gemini')
+   734→   734→def test_gemini():
+   735→   735→    try:
+   736→   736→        # Use the same API key that's already loaded
+   737→   737→        if GOOGLE_API_KEY and GENERATIVE_MODEL_AVAILABLE:
+   738→   738→            response = client.models.generate_content(
+   739→   739→                model="gemini-2.5-flash",
+   740→   740→                contents="Summarize asthma risk factors in 50 words."
+   741→   741→            )
+   742→   742→            return response.text
+   743→   743→        else:
+   744→   744→            return "ERROR: No API key available or model not available"
+   745→   745→    except Exception as e:
+   746→   746→        return f"ERROR: {str(e)}"
+   747→   747→
+   748→   748→if __name__ == '__main__':
+   749→   749→    # Use Render's PORT environment variable, fallback to 5000 for local development
+   750→   750→    port = int(os.environ.get('PORT', 5000))
+   751→   751→    # Disable debug mode for production
+   752→   752→    debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+   753→   753→    app.run(host='0.0.0.0', port=port, debug=debug)
+   754→   754→

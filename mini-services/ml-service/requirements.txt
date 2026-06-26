@@ -1,0 +1,12 @@
+# Python ML mini-service for "breathe" — pinned, Python 3.12 compatible
+tensorflow-cpu==2.17.1
+librosa==0.10.2.post1
+numpy==1.26.4
+soundfile==0.12.1
+lightgbm==4.5.0
+joblib==1.4.2
+flask==3.0.3
+flask-cors==4.0.1
+Werkzeug==3.0.4
+scipy==1.13.1
+scikit-learn==1.5.2

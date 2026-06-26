@@ -1,0 +1,49 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  content   String?
+  published Boolean  @default(false)
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Demo audio library — persistent sample recordings used in the Respiratory
+// Analysis page. Files are stored on disk under storage/sample-audio/<category>/
+// and this table tracks their metadata.
+model SampleAudio {
+  id        String   @id @default(cuid())
+  category  String   // Bronchial | Asthma | COPD | Healthy | Pneumonia
+  filename  String   // display name WITHOUT extension, e.g. "healthy_case_01"
+  extension String   // "wav" | "mp3" | "m4a" | "flac"
+  filepath  String   // absolute path on disk
+  filesize  Int      // bytes
+  duration  Float    // seconds
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+}

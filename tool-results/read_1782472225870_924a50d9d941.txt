@@ -1,0 +1,789 @@
+     1→<!DOCTYPE html>
+     2→<html lang="en">
+     3→<head>
+     4→    <meta charset="UTF-8">
+     5→    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+     6→    <title>AI Doctor – Unified Respiratory Assessment</title>
+     7→    <style>
+     8→        :root {
+     9→            --portage: #957ff7;
+    10→            --froly: #f28476;
+    11→            --downy: #72cbd4;
+    12→            --moon-raker: #e6def8;
+    13→            --mine-shaft: #353535;
+    14→            --contessa: #bf6b66;
+    15→            --perfume: #b395f5;
+    16→            --tradewind: #6ba8b8;
+    17→        }
+    18→        
+    19→        * {
+    20→            margin: 0;
+    21→            padding: 0;
+    22→            box-sizing: border-box;
+    23→            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    24→        }
+    25→        
+    26→        body {
+    27→            background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+    28→            min-height: 100vh;
+    29→            display: flex;
+    30→            align-items: center;
+    31→            justify-content: center;
+    32→            padding: 20px;
+    33→        }
+    34→        
+    35→        .background-shapes {
+    36→            position: fixed;
+    37→            top: 0;
+    38→            left: 0;
+    39→            width: 100%;
+    40→            height: 100%;
+    41→            z-index: -1;
+    42→            overflow: hidden;
+    43→        }
+    44→        
+    45→        .shape {
+    46→            position: absolute;
+    47→            border-radius: 50%;
+    48→            background: rgba(255, 255, 255, 0.3);
+    49→        }
+    50→        
+    51→        .shape-1 {
+    52→            width: 300px;
+    53→            height: 300px;
+    54→            top: -150px;
+    55→            left: -150px;
+    56→        }
+    57→        
+    58→        .shape-2 {
+    59→            width: 200px;
+    60→            height: 200px;
+    61→            bottom: -100px;
+    62→            right: -100px;
+    63→        }
+    64→        
+    65→        .shape-3 {
+    66→            width: 150px;
+    67→            height: 150px;
+    68→            top: 50%;
+    69→            left: -75px;
+    70→        }
+    71→        
+    72→        .shape-4 {
+    73→            width: 100px;
+    74→            height: 100px;
+    75→            bottom: 20%;
+    76→            right: 10%;
+    77→        }
+    78→        
+    79→        .shape-5 {
+    80→            width: 80px;
+    81→            height: 80px;
+    82→            top: 20%;
+    83→            right: 5%;
+    84→        }
+    85→        
+    86→        .container {
+    87→            max-width: 1200px;
+    88→            width: 100%;
+    89→            background: white;
+    90→            border-radius: 20px;
+    91→            overflow: hidden;
+    92→            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    93→            padding: 40px;
+    94→        }
+    95→        
+    96→        /* Header Section */
+    97→        .page-header {
+    98→            display: flex;
+    99→            justify-content: space-between;
+   100→            align-items: center;
+   101→            margin-bottom: 30px;
+   102→            padding-bottom: 20px;
+   103→            border-bottom: 2px solid var(--moon-raker);
+   104→        }
+   105→        
+   106→        .header-left {
+   107→            flex: 1;
+   108→        }
+   109→        
+   110→        .page-title {
+   111→            font-size: 28px;
+   112→            font-weight: 800;
+   113→            color: var(--mine-shaft);
+   114→            margin-bottom: 8px;
+   115→            display: flex;
+   116→            align-items: center;
+   117→            gap: 10px;
+   118→        }
+   119→        
+   120→        .page-title::before {
+   121→            content: "🩺";
+   122→            font-size: 24px;
+   123→        }
+   124→        
+   125→        .subtitle {
+   126→            font-size: 16px;
+   127→            color: #666;
+   128→            font-style: italic;
+   129→        }
+   130→        
+   131→        .header-right {
+   132→            display: flex;
+   133→            gap: 15px;
+   134→            flex-wrap: wrap;
+   135→        }
+   136→        
+   137→        .nav-btn {
+   138→            display: inline-block;
+   139→            padding: 8px 16px;
+   140→            text-decoration: none;
+   141→            border-radius: 6px;
+   142→            font-weight: 600;
+   143→            transition: all 0.3s ease;
+   144→            font-size: 14px;
+   145→            text-align: center;
+   146→        }
+   147→        
+   148→        .nav-btn:hover {
+   149→            transform: translateY(-1px);
+   150→            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+   151→        }
+   152→        
+   153→        .logout-btn {
+   154→            background: linear-gradient(135deg, var(--contessa), #d48a8a);
+   155→            color: white;
+   156→        }
+   157→        
+   158→        .back-btn {
+   159→            background: linear-gradient(135deg, var(--portage), var(--perfume));
+   160→            color: white;
+   161→        }
+   162→        
+   163→        /* Patient Snapshot Card */
+   164→        .patient-snapshot {
+   165→            background: var(--moon-raker);
+   166→            border-radius: 15px;
+   167→            padding: 20px;
+   168→            margin-bottom: 30px;
+   169→            display: flex;
+   170→            flex-wrap: wrap;
+   171→            gap: 20px;
+   172→        }
+   173→        
+   174→        .snapshot-item {
+   175→            display: flex;
+   176→            flex-direction: column;
+   177→            min-width: 120px;
+   178→        }
+   179→        
+   180→        .snapshot-label {
+   181→            font-size: 12px;
+   182→            color: #666;
+   183→            margin-bottom: 4px;
+   184→            font-weight: 500;
+   185→        }
+   186→        
+   187→        .snapshot-value {
+   188→            font-size: 16px;
+   189→            font-weight: 600;
+   190→            color: var(--mine-shaft);
+   191→        }
+   192→        
+   193→        /* Multimodal Analysis Panels */
+   194→        .analysis-panels {
+   195→            display: grid;
+   196→            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+   197→            gap: 25px;
+   198→            margin-bottom: 30px;
+   199→        }
+   200→        
+   201→        .analysis-card {
+   202→            background: white;
+   203→            border-radius: 15px;
+   204→            padding: 25px;
+   205→            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+   206→            border-left: 4px solid;
+   207→        }
+   208→        
+   209→        .audio-card {
+   210→            border-left-color: var(--downy);
+   211→        }
+   212→        
+   213→        .clinical-card {
+   214→            border-left-color: #28a745;
+   215→        }
+   216→        
+   217→        .environmental-card {
+   218→            border-left-color: #ffc107;
+   219→        }
+   220→        
+   221→        .card-title {
+   222→            font-size: 18px;
+   223→            font-weight: 700;
+   224→            color: var(--mine-shaft);
+   225→            margin-bottom: 15px;
+   226→            display: flex;
+   227→            align-items: center;
+   228→            gap: 8px;
+   229→        }
+   230→        
+   231→        .card-content {
+   232→            margin-bottom: 15px;
+   233→        }
+   234→        
+   235→        .card-row {
+   236→            display: flex;
+   237→            justify-content: space-between;
+   238→            margin-bottom: 8px;
+   239→            font-size: 15px;
+   240→        }
+   241→        
+   242→        .card-label {
+   243→            color: #666;
+   244→            font-weight: 500;
+   245→        }
+   246→        
+   247→        .card-value {
+   248→            font-weight: 600;
+   249→            color: var(--mine-shaft);
+   250→        }
+   251→        
+   252→        .symptoms-list {
+   253→            margin-top: 10px;
+   254→        }
+   255→        
+   256→        .symptom-item {
+   257→            display: flex;
+   258→            align-items: center;
+   259→            gap: 8px;
+   260→            margin-bottom: 5px;
+   261→            font-size: 14px;
+   262→        }
+   263→        
+   264→        .symptom-check {
+   265→            color: #28a745;
+   266→            font-weight: bold;
+   267→        }
+   268→        
+   269→        .card-footer {
+   270→            font-size: 13px;
+   271→            color: #888;
+   272→            font-style: italic;
+   273→            padding-top: 15px;
+   274→            border-top: 1px solid var(--moon-raker);
+   275→        }
+   276→        
+   277→        /* Correlation Strip */
+   278→        .correlation-strip {
+   279→            background: #f8f9fa;
+   280→            border-radius: 12px;
+   281→            padding: 20px;
+   282→            margin-bottom: 30px;
+   283→            border-left: 4px solid var(--portage);
+   284→        }
+   285→        
+   286→        .correlation-title {
+   287→            font-size: 18px;
+   288→            font-weight: 700;
+   289→            color: var(--mine-shaft);
+   290→            margin-bottom: 15px;
+   291→            display: flex;
+   292→            align-items: center;
+   293→            gap: 8px;
+   294→        }
+   295→        
+   296→        .correlation-content {
+   297→            font-size: 15px;
+   298→            line-height: 1.6;
+   299→            color: var(--mine-shaft);
+   300→        }
+   301→        
+   302→        .correlation-bullet {
+   303→            margin-left: 20px;
+   304→            margin-bottom: 8px;
+   305→            position: relative;
+   306→        }
+   307→        
+   308→        .correlation-bullet::before {
+   309→            content: "•";
+   310→            position: absolute;
+   311→            left: -20px;
+   312→            color: var(--portage);
+   313→            font-weight: bold;
+   314→        }
+   315→        
+   316→        /* Case Summary */
+   317→        .case-summary {
+   318→            background: var(--moon-raker);
+   319→            border-radius: 15px;
+   320→            padding: 20px;
+   321→            margin-bottom: 30px;
+   322→            cursor: pointer;
+   323→        }
+   324→        
+   325→        .summary-header {
+   326→            display: flex;
+   327→            justify-content: space-between;
+   328→            align-items: center;
+   329→            margin-bottom: 15px;
+   330→        }
+   331→        
+   332→        .summary-title {
+   333→            font-size: 18px;
+   334→            font-weight: 700;
+   335→            color: var(--mine-shaft);
+   336→            display: flex;
+   337→            align-items: center;
+   338→            gap: 8px;
+   339→        }
+   340→        
+   341→        .summary-content {
+   342→            font-size: 15px;
+   343→            line-height: 1.6;
+   344→            color: var(--mine-shaft);
+   345→            display: none;
+   346→        }
+   347→        
+   348→        .summary-content.expanded {
+   349→            display: block;
+   350→        }
+   351→        
+   352→        /* AI Doctor Verdict */
+   353→        .ai-verdict {
+   354→            background: linear-gradient(135deg, #e8f4f8, #e6f7ee);
+   355→            border-radius: 15px;
+   356→            padding: 30px;
+   357→            border: 2px solid #d1ecf1;
+   358→        }
+   359→        
+   360→        .verdict-title {
+   361→            font-size: 24px;
+   362→            font-weight: 800;
+   363→            color: var(--mine-shaft);
+   364→            margin-bottom: 20px;
+   365→            display: flex;
+   366→            align-items: center;
+   367→            gap: 12px;
+   368→        }
+   369→        
+   370→        .verdict-title::before {
+   371→            content: "🤖";
+   372→            font-size: 28px;
+   373→        }
+   374→        
+   375→        .verdict-content {
+   376→            font-size: 16px;
+   377→            line-height: 1.7;
+   378→            color: var(--mine-shaft);
+   379→            font-style: italic;
+   380→        }
+   381→        
+   382→        .verdict-loading {
+   383→            text-align: center;
+   384→            padding: 20px;
+   385→            color: #666;
+   386→        }
+   387→        
+   388→        .verdict-button {
+   389→            background: linear-gradient(135deg, var(--portage), var(--perfume));
+   390→            color: white;
+   391→            padding: 12px 24px;
+   392→            border: none;
+   393→            border-radius: 8px;
+   394→            font-size: 16px;
+   395→            font-weight: 600;
+   396→            cursor: pointer;
+   397→            transition: all 0.3s ease;
+   398→            display: block;
+   399→            margin: 20px auto 0;
+   400→            width: 220px;
+   401→            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+   402→        }
+   403→        
+   404→        .verdict-button:hover {
+   405→            transform: translateY(-2px);
+   406→            box-shadow: 0 6px 12px rgba(149, 127, 247, 0.4);
+   407→        }
+   408→        
+   409→        .verdict-button:disabled {
+   410→            background: #cccccc;
+   411→            cursor: not-allowed;
+   412→            transform: none;
+   413→            box-shadow: none;
+   414→        }
+   415→        
+   416→        @media (max-width: 768px) {
+   417→            .container {
+   418→                padding: 20px;
+   419→            }
+   420→            
+   421→            .page-header {
+   422→                flex-direction: column;
+   423→                gap: 15px;
+   424→                text-align: center;
+   425→            }
+   426→            
+   427→            .header-right {
+   428→                justify-content: center;
+   429→            }
+   430→            
+   431→            .analysis-panels {
+   432→                grid-template-columns: 1fr;
+   433→            }
+   434→            
+   435→            .patient-snapshot {
+   436→                flex-direction: column;
+   437→                gap: 15px;
+   438→            }
+   439→        }
+   440→    </style>
+   441→</head>
+   442→<body>
+   443→    <div class="background-shapes">
+   444→        <div class="shape shape-1"></div>
+   445→        <div class="shape shape-2"></div>
+   446→        <div class="shape shape-3"></div>
+   447→        <div class="shape shape-4"></div>
+   448→        <div class="shape shape-5"></div>
+   449→    </div>
+   450→    
+   451→    <div class="container">
+   452→        <!-- PAGE HEADER -->
+   453→        <div class="page-header">
+   454→            <div class="header-left">
+   455→                <h1 class="page-title">AI Doctor – Unified Respiratory Assessment</h1>
+   456→                <p class="subtitle">Multimodal AI-assisted clinical decision support</p>
+   457→            </div>
+   458→            <div class="header-right">
+   459→                <a href="/logout" class="nav-btn logout-btn">🔒 Logout</a>
+   460→                <a href="/" class="nav-btn back-btn">⬅ Back to Audio Analysis</a>
+   461→            </div>
+   462→        </div>
+   463→        
+   464→        <!-- PATIENT SNAPSHOT CARD -->
+   465→        <div class="patient-snapshot">
+   466→            <div class="snapshot-item">
+   467→                <span class="snapshot-label">Age</span>
+   468→                <span class="snapshot-value" id="ageValue">--</span>
+   469→            </div>
+   470→            <div class="snapshot-item">
+   471→                <span class="snapshot-label">Gender</span>
+   472→                <span class="snapshot-value" id="genderValue">--</span>
+   473→            </div>
+   474→            <div class="snapshot-item">
+   475→                <span class="snapshot-label">BMI</span>
+   476→                <span class="snapshot-value" id="bmiValue">--</span>
+   477→            </div>
+   478→            <div class="snapshot-item">
+   479→                <span class="snapshot-label">Smoking</span>
+   480→                <span class="snapshot-value" id="smokingValue">--</span>
+   481→            </div>
+   482→            <div class="snapshot-item">
+   483→                <span class="snapshot-label">Allergy</span>
+   484→                <span class="snapshot-value" id="allergyValue">--</span>
+   485→            </div>
+   486→            <div class="snapshot-item">
+   487→                <span class="snapshot-label">Family History</span>
+   488→                <span class="snapshot-value" id="familyHistoryValue">--</span>
+   489→            </div>
+   490→        </div>
+   491→        
+   492→        <!-- MULTIMODAL ANALYSIS PANELS -->
+   493→        <div class="analysis-panels">
+   494→            <!-- Audio Respiratory Analysis Card -->
+   495→            <div class="analysis-card audio-card">
+   496→                <h3 class="card-title">🎧 Audio Respiratory Analysis</h3>
+   497→                <div class="card-content">
+   498→                    <div class="card-row">
+   499→                        <span class="card-label">Detected Condition:</span>
+   500→                        <span class="card-value" id="audioCondition">--</span>
+   501→                    </div>
+   502→                    <div class="card-row">
+   503→                        <span class="card-label">Audio File:</span>
+   504→                        <span class="card-value" id="audioFile">--</span>
+   505→                    </div>
+   506→                </div>
+   507→                <div class="card-footer">AI-assisted signal analysis</div>
+   508→            </div>
+   509→            
+   510→            <!-- Clinical Asthma Assessment Card -->
+   511→            <div class="analysis-card clinical-card">
+   512→                <h3 class="card-title">🫁 Clinical Asthma Assessment</h3>
+   513→                <div class="card-content">
+   514→                    <div class="card-row">
+   515→                        <span class="card-label">Diagnosis:</span>
+   516→                        <span class="card-value" id="asthmaDiagnosis">--</span>
+   517→                    </div>
+   518→                    <div class="card-row">
+   519→                        <span class="card-label">FEV1:</span>
+   520→                        <span class="card-value" id="fev1Value">--</span>
+   521→                    </div>
+   522→                    <div class="symptoms-list" id="symptomsList">
+   523→                        <!-- Symptoms will be populated dynamically -->
+   524→                    </div>
+   525→                </div>
+   526→                <div class="card-footer">ML-based clinical inference</div>
+   527→            </div>
+   528→            
+   529→            <!-- Environmental Exposure Card -->
+   530→            <div class="analysis-card environmental-card">
+   531→                <h3 class="card-title">🌫 Environmental Exposure</h3>
+   532→                <div class="card-content">
+   533→                    <div class="card-row">
+   534→                        <span class="card-label">Location:</span>
+   535→                        <span class="card-value" id="locationValue">--</span>
+   536→                    </div>
+   537→                    <div class="card-row">
+   538→                        <span class="card-label">AQI:</span>
+   539→                        <span class="card-value" id="aqiValue">--</span>
+   540→                    </div>
+   541→                    <div class="card-row">
+   542→                        <span class="card-label">PM2.5:</span>
+   543→                        <span class="card-value" id="pm25Value">--</span>
+   544→                    </div>
+   545→                    <div class="card-row">
+   546→                        <span class="card-label">Weather:</span>
+   547→                        <span class="card-value" id="weatherValue">--</span>
+   548→                    </div>
+   549→                    <div class="card-row">
+   550→                        <span class="card-label">Humidity:</span>
+   551→                        <span class="card-value" id="humidityValue">--</span>
+   552→                    </div>
+   553→                    <div class="card-row">
+   554→                        <span class="card-label">Wind:</span>
+   555→                        <span class="card-value" id="windValue">--</span>
+   556→                    </div>
+   557→                </div>
+   558→                <div class="card-footer">Nearest available monitoring station</div>
+   559→            </div>
+   560→        </div>
+   561→        
+   562→        <!-- TRIGGER & SYMPTOM CORRELATION STRIP -->
+   563→        <div class="correlation-strip">
+   564→            <h3 class="correlation-title">🔗 Symptom–Trigger Correlation</h3>
+   565→            <div class="correlation-content" id="correlationContent">
+   566→                <!-- Correlation content will be populated dynamically -->
+   567→            </div>
+   568→        </div>
+   569→        
+   570→        <!-- UNIFIED CASE SUMMARY -->
+   571→        <div class="case-summary" id="caseSummary">
+   572→            <div class="summary-header">
+   573→                <h3 class="summary-title">📄 Unified Case Summary (for AI reasoning)</h3>
+   574→                <span id="expandIcon">▼</span>
+   575→            </div>
+   576→            <div class="summary-content" id="summaryContent">
+   577→                <!-- Summary will be populated dynamically -->
+   578→            </div>
+   579→        </div>
+   580→        
+   581→        <!-- AI DOCTOR VERDICT -->
+   582→        <div class="ai-verdict">
+   583→            <h2 class="verdict-title">AI Doctor Verdict</h2>
+   584→            <div id="verdictContent">
+   585→                <div class="verdict-loading" id="loadingMessage">
+   586→                    Please review all assessments and click "Generate AI Verdict" to get AI doctor's opinion.
+   587→                </div>
+   588→                <p class="verdict-content" id="verdictText" style="display: none;"></p>
+   589→            </div>
+   590→            <button class="verdict-button" id="generateVerdictBtn">Generate AI Verdict</button>
+   591→        </div>
+   592→    </div>
+   593→
+   594→    <script>
+   595→        // Toggle case summary expansion
+   596→        const caseSummary = document.getElementById('caseSummary');
+   597→        const summaryContent = document.getElementById('summaryContent');
+   598→        const expandIcon = document.getElementById('expandIcon');
+   599→        
+   600→        let isExpanded = false;
+   601→        
+   602→        caseSummary.addEventListener('click', () => {
+   603→            isExpanded = !isExpanded;
+   604→            if (isExpanded) {
+   605→                summaryContent.classList.add('expanded');
+   606→                expandIcon.textContent = '▲';
+   607→            } else {
+   608→                summaryContent.classList.remove('expanded');
+   609→                expandIcon.textContent = '▼';
+   610→            }
+   611→        });
+   612→        
+   613→        // Load data from session
+   614→        document.addEventListener('DOMContentLoaded', async function() {
+   615→            try {
+   616→                const response = await fetch('/get_patient_data');
+   617→                const data = await response.json();
+   618→                
+   619→                if (data.success) {
+   620→                    // Populate patient snapshot
+   621→                    document.getElementById('ageValue').textContent = data.patient_data.age || '--';
+   622→                    document.getElementById('genderValue').textContent = data.patient_data.gender === 0 ? 'Male' : (data.patient_data.gender === 1 ? 'Female' : '--');
+   623→                    document.getElementById('bmiValue').textContent = data.patient_data.bmi || '--';
+   624→                    document.getElementById('smokingValue').textContent = data.patient_data.smoking === 0 ? 'Non-smoker' : (data.patient_data.smoking === 1 ? 'Former smoker' : (data.patient_data.smoking === 2 ? 'Current smoker' : '--'));
+   625→                    document.getElementById('allergyValue').textContent = data.patient_data.allergyHistory === 0 ? 'No' : (data.patient_data.allergyHistory === 1 ? 'Yes' : '--');
+   626→                    document.getElementById('familyHistoryValue').textContent = data.patient_data.familyHistory === 0 ? 'No' : (data.patient_data.familyHistory === 1 ? 'Yes' : '--');
+   627→                    
+   628→                    // Populate audio analysis
+   629→                    document.getElementById('audioCondition').textContent = data.audio_analysis?.prediction || '--';
+   630→                    document.getElementById('audioFile').textContent = data.audio_analysis?.filename || '--';
+   631→                    
+   632→                    // Populate asthma assessment
+   633→                    document.getElementById('asthmaDiagnosis').textContent = data.asthma_assessment?.prediction || '--';
+   634→                    document.getElementById('fev1Value').textContent = data.patient_data.lungFunctionFeV1 || '--';
+   635→                    
+   636→                    // Populate symptoms list
+   637→                    const symptomsList = document.getElementById('symptomsList');
+   638→                    symptomsList.innerHTML = '';
+   639→                    if (data.patient_data.wheezing === 1) {
+   640→                        const symptomItem = document.createElement('div');
+   641→                        symptomItem.className = 'symptom-item';
+   642→                        symptomItem.innerHTML = '<span class="symptom-check">✓</span><span>Wheezing</span>';
+   643→                        symptomsList.appendChild(symptomItem);
+   644→                    }
+   645→                    if (data.patient_data.shortnessOfBreath === 1) {
+   646→                        const symptomItem = document.createElement('div');
+   647→                        symptomItem.className = 'symptom-item';
+   648→                        symptomItem.innerHTML = '<span class="symptom-check">✓</span><span>Shortness of Breath</span>';
+   649→                        symptomsList.appendChild(symptomItem);
+   650→                    }
+   651→                    if (data.patient_data.chestTightness === 1) {
+   652→                        const symptomItem = document.createElement('div');
+   653→                        symptomItem.className = 'symptom-item';
+   654→                        symptomItem.innerHTML = '<span class="symptom-check">✓</span><span>Chest Tightness</span>';
+   655→                        symptomsList.appendChild(symptomItem);
+   656→                    }
+   657→                    
+   658→                    // Populate environmental data
+   659→                    if (data.environmental_data) {
+   660→                        document.getElementById('locationValue').textContent = data.environmental_data.location ? 
+   661→                            `${data.environmental_data.location.name}, ${data.environmental_data.location.region}` : '--';
+   662→                        document.getElementById('aqiValue').textContent = data.environmental_data.aqi ? 
+   663→                            `Moderate (US-EPA ${data.environmental_data.epaIndex})` : '--';
+   664→                        document.getElementById('pm25Value').textContent = data.environmental_data.pm25 ? 
+   665→                            `${data.environmental_data.pm25} µg/m³` : '--';
+   666→                        document.getElementById('weatherValue').textContent = data.environmental_data.weatherDescription || '--';
+   667→                        document.getElementById('humidityValue').textContent = data.environmental_data.humidity ? 
+   668→                            `${data.environmental_data.humidity}%` : '--';
+   669→                        document.getElementById('windValue').textContent = data.environmental_data.windSpeed ? 
+   670→                            `${data.environmental_data.windSpeed} km/h` : '--';
+   671→                    }
+   672→                    
+   673→                    // Populate correlation strip
+   674→                    const correlationContent = document.getElementById('correlationContent');
+   675→                    correlationContent.innerHTML = '';
+   676→                    
+   677→                    if (data.environmental_data) {
+   678→                        const epaIndex = data.environmental_data.epaIndex || 1;
+   679→                        let pollutionText = '';
+   680→                        if (epaIndex <= 1) {
+   681→                            pollutionText = 'Air quality is good, unlikely to worsen respiratory symptoms';
+   682→                        } else if (epaIndex === 2) {
+   683→                            pollutionText = 'Moderate air pollution may contribute to respiratory symptoms';
+   684→                        } else {
+   685→                            pollutionText = 'Higher pollution levels may significantly worsen respiratory symptoms';
+   686→                        }
+   687→                        
+   688→                        const bullet1 = document.createElement('div');
+   689→                        bullet1.className = 'correlation-bullet';
+   690→                        bullet1.textContent = pollutionText;
+   691→                        correlationContent.appendChild(bullet1);
+   692→                        
+   693→                        if (data.environmental_data.pm25 > 25) {
+   694→                            const bullet2 = document.createElement('div');
+   695→                            bullet2.className = 'correlation-bullet';
+   696→                            bullet2.textContent = `PM2.5 levels (${data.environmental_data.pm25} µg/m³) may contribute to airway irritation`;
+   697→                            correlationContent.appendChild(bullet2);
+   698→                        }
+   699→                        
+   700→                        if (data.environmental_data.windSpeed > 25) {
+   701→                            const bullet3 = document.createElement('div');
+   702→                            bullet3.className = 'correlation-bullet';
+   703→                            bullet3.textContent = `High wind speeds (${data.environmental_data.windSpeed} km/h) may spread allergens and irritants`;
+   704→                            correlationContent.appendChild(bullet3);
+   705→                        } else {
+   706→                            const bullet3 = document.createElement('div');
+   707→                            bullet3.className = 'correlation-bullet';
+   708→                            bullet3.textContent = `Wind conditions unlikely to worsen symptoms`;
+   709→                            correlationContent.appendChild(bullet3);
+   710→                        }
+   711→                    }
+   712→                    
+   713→                    // Populate case summary
+   714→                    const summaryText = document.getElementById('summaryContent');
+   715→                    let summary = '';
+   716→                    if (data.patient_data.age) {
+   717→                        summary += `${data.patient_data.age}-year-old `;
+   718→                    }
+   719→                    if (data.patient_data.gender !== undefined) {
+   720→                        summary += data.patient_data.gender === 0 ? 'male ' : 'female ';
+   721→                    }
+   722→                    if (data.patient_data.bmi) {
+   723→                        summary += `with BMI ${data.patient_data.bmi}. `;
+   724→                    }
+   725→                    if (data.patient_data.smoking !== undefined) {
+   726→                        const smokingStatus = data.patient_data.smoking === 0 ? 'non-smoker' : 
+   727→                                            (data.patient_data.smoking === 1 ? 'former smoker' : 'current smoker');
+   728→                        summary += `Smoking status: ${smokingStatus}. `;
+   729→                    }
+   730→                    if (data.audio_analysis?.prediction) {
+   731→                        summary += `Audio analysis suggests ${data.audio_analysis.prediction}. `;
+   732→                    }
+   733→                    if (data.asthma_assessment?.prediction) {
+   734→                        summary += `Clinical assessment indicates ${data.asthma_assessment.prediction}. `;
+   735→                    }
+   736→                    if (data.environmental_data) {
+   737→                        summary += `Environmental exposure shows ${data.environmental_data.aqi ? 'moderate air quality' : 'various conditions'}. `;
+   738→                    }
+   739→                    summary += 'Findings suggest possible respiratory condition with environmental factors contributing to symptoms.';
+   740→                    
+   741→                    summaryText.textContent = summary;
+   742→                } else {
+   743→                    console.error('Failed to load patient data:', data.error);
+   744→                }
+   745→            } catch (error) {
+   746→                console.error('Error loading patient data:', error);
+   747→            }
+   748→        });
+   749→        
+   750→        // Generate AI Verdict
+   751→        document.getElementById('generateVerdictBtn').addEventListener('click', async function() {
+   752→            const btn = document.getElementById('generateVerdictBtn');
+   753→            const loadingMessage = document.getElementById('loadingMessage');
+   754→            const verdictText = document.getElementById('verdictText');
+   755→            
+   756→            btn.disabled = true;
+   757→            btn.textContent = 'Generating...';
+   758→            loadingMessage.style.display = 'block';
+   759→            loadingMessage.textContent = 'AI Doctor is analyzing the case...';
+   760→            verdictText.style.display = 'none';
+   761→            
+   762→            try {
+   763→                const response = await fetch('/generate_ai_verdict', {
+   764→                    method: 'POST',
+   765→                    headers: {
+   766→                        'Content-Type': 'application/json'
+   767→                    }
+   768→                });
+   769→                
+   770→                const data = await response.json();
+   771→                
+   772→                if (data.success) {
+   773→                    loadingMessage.style.display = 'none';
+   774→                    verdictText.innerText = data.verdict;
+   775→                    verdictText.style.display = 'block';
+   776→                } else {
+   777→                    loadingMessage.textContent = 'Error: ' + (data.error || 'Failed to generate AI verdict');
+   778→                }
+   779→            } catch (error) {
+   780→                console.error('Error generating AI verdict:', error);
+   781→                loadingMessage.textContent = 'Error: Failed to connect to AI service';
+   782→            } finally {
+   783→                btn.disabled = false;
+   784→                btn.textContent = 'Generate AI Verdict';
+   785→            }
+   786→        });
+   787→    </script>
+   788→</body>
+   789→</html>
