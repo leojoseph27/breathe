@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useBreatheStore } from "@/lib/breathe-store";
 import { ClinicalReport } from "@/components/breathe/ClinicalReport";
 import { exportClinicalReport } from "@/components/breathe/export-report";
@@ -18,6 +18,14 @@ import {
   Download,
   AlertCircle,
 } from "lucide-react";
+
+const LOADING_STEPS = [
+  "Analyzing patient information...",
+  "Correlating respiratory findings...",
+  "Evaluating environmental exposure...",
+  "Generating clinical reasoning...",
+  "Preparing final report...",
+];
 
 const yn = (v?: number) =>
   v === 1 ? "Yes" : v === 0 ? "No" : "--";
@@ -38,6 +46,19 @@ export function AIDoctorView() {
   const [reportSource, setReportSource] = useState<string>("");
   const [generatedAt, setGeneratedAt] = useState<string>("");
   const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0);
+
+  // Rotate loading messages while the report is being generated
+  useEffect(() => {
+    if (!loading) {
+      setLoadingStep(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setLoadingStep((s) => (s + 1) % LOADING_STEPS.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [loading]);
 
   async function generateVerdict() {
     setLoading(true);
@@ -364,7 +385,7 @@ export function AIDoctorView() {
         >
           {loading ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Generating Report…
+              <Loader2 className="h-4 w-4 animate-spin" /> {LOADING_STEPS[loadingStep]}
             </>
           ) : (
             <>
@@ -372,10 +393,30 @@ export function AIDoctorView() {
             </>
           )}
         </button>
-        <p className="text-center text-xs text-slate-400">
-          The AI analyzes all modules and generates an 800–1500 word structured
-          report. This may take 10–20 seconds.
-        </p>
+        {loading && (
+          <div className="flex flex-col items-center gap-1.5">
+            <div className="flex gap-1.5">
+              {LOADING_STEPS.map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-1.5 w-8 rounded-full transition-colors ${
+                    i <= loadingStep ? "bg-sky-500" : "bg-slate-200"
+                  }`}
+                />
+              ))}
+            </div>
+            <p className="text-center text-xs text-slate-400">
+              Analyzing all modules and correlating findings. This may take
+              30–60 seconds.
+            </p>
+          </div>
+        )}
+        {!loading && (
+          <p className="text-center text-xs text-slate-400">
+            The AI analyzes all modules and generates a structured clinical
+            report. This may take 30–60 seconds.
+          </p>
+        )}
       </div>
 
       {/* Error */}
