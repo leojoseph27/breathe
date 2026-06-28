@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useBreatheStore } from "@/lib/breathe-store";
+import { ClinicalReport } from "@/components/breathe/ClinicalReport";
+import { exportClinicalReport } from "@/components/breathe/export-report";
 import {
   Loader2,
   ChevronDown,
@@ -13,6 +15,8 @@ import {
   Link2,
   FileText,
   Sparkles,
+  Download,
+  AlertCircle,
 } from "lucide-react";
 
 const yn = (v?: number) =>
@@ -28,15 +32,17 @@ export function AIDoctorView() {
   const asthmaAssessment = useBreatheStore((s) => s.asthmaAssessment);
   const environmentalData = useBreatheStore((s) => s.environmentalData);
 
-  const [verdict, setVerdict] = useState<string | null>(null);
+  const [report, setReport] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [expanded, setExpanded] = useState(false);
+  const [reportSource, setReportSource] = useState<string>("");
+  const [generatedAt, setGeneratedAt] = useState<string>("");
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
 
   async function generateVerdict() {
     setLoading(true);
     setError("");
-    setVerdict(null);
+    setReport(null);
     try {
       const res = await fetch("/api/generate-ai-verdict", {
         method: "POST",
@@ -50,9 +56,11 @@ export function AIDoctorView() {
       });
       const json = await res.json();
       if (json.success && json.verdict) {
-        setVerdict(json.verdict);
+        setReport(json.verdict);
+        setReportSource(json.source || "gemini");
+        setGeneratedAt(new Date().toISOString());
       } else {
-        setError(json.error || "Failed to generate AI verdict");
+        setError(json.error || "Failed to generate AI report");
       }
     } catch (err) {
       setError("Failed to connect to AI service: " + String(err));
@@ -61,27 +69,12 @@ export function AIDoctorView() {
     }
   }
 
-  function buildSummary(): string {
-    let s = "";
-    if (patientData.age) s += `${patientData.age}-year-old `;
-    if (patientData.gender !== undefined)
-      s += patientData.gender === 0 ? "male " : "female ";
-    if (patientData.bmi) s += `with BMI ${patientData.bmi}. `;
-    if (patientData.smoking !== undefined) {
-      s += `Smoking status: ${smokeStr(patientData.smoking).toLowerCase()}. `;
-    }
-    if (audioAnalysis.prediction)
-      s += `Audio analysis suggests ${audioAnalysis.prediction}. `;
-    if (asthmaAssessment.prediction)
-      s += `Clinical assessment indicates ${asthmaAssessment.prediction}. `;
-    if (environmentalData.aqi !== undefined) {
-      s += `Environmental exposure shows ${
-        environmentalData.aqi ? "moderate air quality" : "various conditions"
-      }. `;
-    }
-    s +=
-      "Findings suggest possible respiratory condition with environmental factors contributing to symptoms.";
-    return s || "No assessment data yet. Complete the other sections first.";
+  function handleExport() {
+    if (!report) return;
+    exportClinicalReport({
+      markdown: report,
+      generatedAt: generatedAt || new Date().toISOString(),
+    });
   }
 
   const epa = environmentalData.epaIndex ?? 1;
@@ -138,8 +131,16 @@ export function AIDoctorView() {
       rows: [
         { label: "Detected Condition", value: audioAnalysis.prediction || "--" },
         { label: "Audio File", value: audioAnalysis.filename || "--" },
+        ...(audioAnalysis.confidence
+          ? [
+              {
+                label: "Confidence",
+                value: `${Math.round(audioAnalysis.confidence * 100)}%`,
+              },
+            ]
+          : []),
       ],
-      footer: "AI-assisted signal analysis",
+      footer: "CNN model prediction",
     },
     {
       icon: HeartPulse,
@@ -147,6 +148,9 @@ export function AIDoctorView() {
       accent: "#06b6d4",
       rows: [
         { label: "Diagnosis", value: asthmaAssessment.prediction || "--" },
+        ...(asthmaAssessment.confidence
+          ? [{ label: "Confidence", value: `${asthmaAssessment.confidence}%` }]
+          : []),
         {
           label: "FEV1",
           value: patientData.lungFunctionFeV1
@@ -154,7 +158,7 @@ export function AIDoctorView() {
             : "--",
         },
       ],
-      footer: "ML-based clinical inference",
+      footer: "LightGBM model prediction",
       extra:
         symptoms.length > 0 ? (
           <div className="mt-2 flex flex-wrap gap-1">
@@ -198,7 +202,7 @@ export function AIDoctorView() {
           value: environmentalData.weatherDescription || "--",
         },
       ],
-      footer: "Nearest available monitoring station",
+      footer: "Nearest monitoring station",
     },
   ];
 
@@ -207,11 +211,11 @@ export function AIDoctorView() {
       {/* Page header */}
       <div>
         <h2 className="text-xl font-semibold tracking-tight text-slate-900">
-          AI Doctor — Unified Respiratory Assessment
+          AI Doctor — Clinical Decision Support
         </h2>
         <p className="mt-1 text-sm text-slate-500">
-          Multimodal AI-assisted clinical decision support, aggregating data
-          from all previous assessments.
+          Generates a comprehensive, structured respiratory assessment report by
+          analyzing all previous modules and correlating findings.
         </p>
       </div>
 
@@ -219,9 +223,12 @@ export function AIDoctorView() {
         <div className="flex items-start gap-3 rounded-xl border border-sky-100 bg-sky-50/70 p-4">
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
           <div className="text-[13px] leading-relaxed text-slate-600">
-            Complete the Audio Analysis, Asthma Detection, and Safe Check
-            sections first to populate this unified view, then generate an AI
-            verdict.
+            <span className="font-medium text-slate-900">
+              Complete the assessments first.
+            </span>{" "}
+            Run the Audio Analysis, Asthma Detection, and Safe Check sections to
+            populate the data this report needs. Then click{" "}
+            <span className="font-medium">Generate Clinical Report</span> below.
           </div>
         </div>
       )}
@@ -279,15 +286,15 @@ export function AIDoctorView() {
         })}
       </div>
 
-      {/* Correlation */}
-      <div className="bd-card p-5">
-        <div className="mb-3 flex items-center gap-2">
-          <Link2 className="h-4 w-4 text-sky-600" />
-          <h3 className="text-[13px] font-semibold text-slate-900">
-            Symptom–Trigger Correlation
-          </h3>
-        </div>
-        {correlation.length ? (
+      {/* Quick correlation preview */}
+      {correlation.length > 0 && (
+        <div className="bd-card p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <Link2 className="h-4 w-4 text-sky-600" />
+            <h3 className="text-[13px] font-semibold text-slate-900">
+              Quick Symptom–Trigger Correlation
+            </h3>
+          </div>
           <ul className="space-y-1.5">
             {correlation.map((c, i) => (
               <li
@@ -299,109 +306,130 @@ export function AIDoctorView() {
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="text-[13px] text-slate-500">
-            Complete the Safe Check to see symptom–trigger correlations.
-          </p>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Case summary (expandable) */}
+      {/* Expandable raw data summary */}
       <div className="bd-card overflow-hidden">
         <button
           type="button"
-          onClick={() => setExpanded((e) => !e)}
+          onClick={() => setSummaryExpanded((e) => !e)}
           className="flex w-full items-center justify-between gap-2 p-5 text-left transition-colors hover:bg-slate-50/50"
-          aria-expanded={expanded}
+          aria-expanded={summaryExpanded}
         >
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-sky-600" />
             <span className="text-[13px] font-semibold text-slate-900">
-              Unified Case Summary
-            </span>
-            <span className="text-[11px] font-normal text-slate-400">
-              for AI reasoning
+              Data Summary (for AI reasoning)
             </span>
           </div>
-          {expanded ? (
+          {summaryExpanded ? (
             <ChevronUp className="h-4 w-4 text-slate-400" />
           ) : (
             <ChevronDown className="h-4 w-4 text-slate-400" />
           )}
         </button>
-        {expanded && (
+        {summaryExpanded && (
           <div className="border-t border-slate-100 p-5">
-            <p className="text-[13px] leading-relaxed text-slate-600">
-              {buildSummary()}
-            </p>
+            <pre className="bd-scroll overflow-x-auto rounded-lg bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-600">
+{JSON.stringify(
+  {
+    patientData,
+    audioAnalysis,
+    asthmaAssessment,
+    environmentalData,
+  },
+  null,
+  2
+)}
+            </pre>
           </div>
         )}
       </div>
 
-      {/* AI verdict */}
-      <div
-        className="rounded-2xl border border-sky-100 p-6 sm:p-7"
-        style={{
-          background:
-            "linear-gradient(135deg, rgba(224,242,254,0.6), rgba(236,254,255,0.6))",
-        }}
-      >
-        <div className="mb-4 flex items-center gap-2.5">
-          <span
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm"
-            style={{ background: "linear-gradient(135deg, #0ea5e9, #06b6d4)" }}
-          >
-            <Stethoscope className="h-5 w-5" />
-          </span>
-          <div>
-            <h3 className="text-base font-semibold text-slate-900">
-              AI Doctor Verdict
-            </h3>
-            <p className="text-[11px] text-slate-500">
-              Generated from your unified assessment data
+      {/* Generate button */}
+      <div className="flex flex-col items-center gap-3">
+        <button
+          type="button"
+          onClick={generateVerdict}
+          disabled={loading}
+          className="bd-btn bd-btn-primary bd-btn-lg w-full max-w-sm"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> Generating Report…
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4" /> Generate Clinical Report
+            </>
+          )}
+        </button>
+        <p className="text-center text-xs text-slate-400">
+          The AI analyzes all modules and generates an 800–1500 word structured
+          report. This may take 10–20 seconds.
+        </p>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div
+          className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4"
+          role="alert"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+          <div className="text-[13px] text-slate-700">
+            <p className="font-medium text-slate-900">
+              Could not generate the full AI report.
+            </p>
+            <p className="mt-1 text-slate-600">{error}</p>
+            <p className="mt-1 text-slate-600">
+              A structured fallback report is shown below with all available
+              data.
             </p>
           </div>
         </div>
+      )}
 
-        <div className="min-h-[80px]">
-          {loading ? (
-            <div className="flex items-center gap-2 py-4 text-sm text-slate-500">
-              <Loader2 className="h-4 w-4 animate-spin text-sky-600" />
-              AI Doctor is analyzing the case…
+      {/* Report */}
+      {report && (
+        <div className="space-y-4 bd-fade-in">
+          {/* Report toolbar */}
+          <div className="flex flex-col gap-3 rounded-xl border border-sky-100 bg-sky-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2.5">
+              <span
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm"
+                style={{
+                  background: "linear-gradient(135deg, #0ea5e9, #06b6d4)",
+                }}
+              >
+                <Stethoscope className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="text-[15px] font-semibold text-slate-900">
+                  Clinical Decision Support Report
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  {reportSource === "fallback"
+                    ? "Fallback report (AI service unavailable)"
+                    : "AI-generated · " +
+                      new Date(generatedAt).toLocaleString()}
+                </p>
+              </div>
             </div>
-          ) : verdict ? (
-            <p className="whitespace-pre-line text-[14px] leading-relaxed text-slate-700">
-              {verdict}
-            </p>
-          ) : error ? (
-            <p className="py-2 text-[13px] text-red-600">Error: {error}</p>
-          ) : (
-            <p className="py-2 text-[13px] text-slate-500">
-              Review all assessments and click &quot;Generate AI Verdict&quot;
-              to get the AI doctor&apos;s opinion.
-            </p>
-          )}
-        </div>
+            <button
+              type="button"
+              onClick={handleExport}
+              className="bd-btn bd-btn-secondary"
+            >
+              <Download className="h-4 w-4" /> Export Clinical Report
+            </button>
+          </div>
 
-        <div className="mt-4 flex justify-center">
-          <button
-            type="button"
-            onClick={generateVerdict}
-            disabled={loading}
-            className="bd-btn bd-btn-primary bd-btn-lg w-full max-w-xs"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Generating…
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4" /> Generate AI Verdict
-              </>
-            )}
-          </button>
+          {/* Report sections */}
+          <ClinicalReport markdown={report} />
         </div>
-      </div>
+      )}
     </div>
   );
 }
