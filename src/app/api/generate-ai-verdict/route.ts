@@ -157,107 +157,218 @@ ENVIRONMENTAL EXPOSURE DATA:
 Now generate the full structured report following the system instructions exactly. Use the section headings specified. Populate all tables with the ACTUAL patient values above — never use placeholder or hardcoded values.`;
 }
 
-const FALLBACK_VERDICT = `## Patient Summary
+/**
+ * Build a DYNAMIC fallback report from the actual patient data.
+ * This is used when Gemini is unavailable (geo-restriction, missing key, etc.)
+ * but the assessment data IS available — so the report still shows real values
+ * instead of hardcoded N/A placeholders.
+ */
+function buildDynamicFallback(b: VerdictBody, reason: string): string {
+  const p = b.patientData || {};
+  const a = b.audioAnalysis || {};
+  const ast = b.asthmaAssessment || {};
+  const e = b.environmentalData || {};
 
-This report presents a multimodal respiratory assessment combining audio analysis, clinical asthma prediction, and environmental exposure data. Due to an AI service limitation, the detailed narrative sections below could not be generated automatically; the structured data and recommendations are still available for physician review.
+  const age = p.age ?? "N/A";
+  const gender = genderStr(p.gender);
+  const bmi = p.bmi ?? "N/A";
+  const smoking = smokeStr(p.smoking);
+  const familyHistory = yn(p.familyHistory);
+  const allergies = yn(p.allergyHistory);
+  const fev1 = p.lungFunctionFeV1 ? `${p.lungFunctionFeV1}%` : "N/A";
+  const audioPred = a.prediction || "N/A";
+  const asthmaPred = ast.prediction || "N/A";
+  const aqi = e.aqi ?? "N/A";
+  const pm25 = e.pm25 ?? "N/A";
+  const weather = e.weatherDescription || "N/A";
+  const location = e.resolvedLocation?.name
+    ? `${e.resolvedLocation.name}, ${e.resolvedLocation.region || ""}`.trim()
+    : "N/A";
+  const temp = e.temperature ? `${e.temperature}°C` : "N/A";
+  const humidity = e.humidity ? `${e.humidity}%` : "N/A";
+  const wind = e.windSpeed ? `${e.windSpeed} km/h` : "N/A";
+  const epaIdx = e.epaIndex ?? "N/A";
+
+  // Determine risk levels from actual data
+  const smokingRisk =
+    p.smoking === 2 ? "High" : p.smoking === 1 ? "Moderate" : p.smoking === 0 ? "Low" : "Unknown";
+  const familyRisk =
+    p.familyHistory === 1 ? "High" : p.familyHistory === 0 ? "Low" : "Unknown";
+  const bmiRisk =
+    p.bmi && p.bmi >= 30 ? "High" : p.bmi && p.bmi >= 25 ? "Moderate" : p.bmi ? "Low" : "Unknown";
+  const allergyRisk =
+    p.allergyHistory === 1 ? "Moderate" : p.allergyHistory === 0 ? "Low" : "Unknown";
+  const pollutionRisk =
+    (e.epaIndex ?? 1) >= 4 ? "High" : (e.epaIndex ?? 1) >= 2 ? "Moderate" : "Low";
+  const envRisk = pollutionRisk;
+
+  // Audio interpretation
+  const audioInterp = a.prediction
+    ? a.prediction.toLowerCase() === "asthma"
+      ? "The audio analysis detected patterns consistent with asthma, which typically presents as wheezing — a high-pitched whistling sound caused by narrowed airways during exhalation. This finding suggests airway obstruction and bronchospasm."
+      : a.prediction.toLowerCase() === "copd"
+      ? "The audio analysis detected patterns consistent with COPD, which often presents with decreased breath sounds, prolonged expiration, and occasionally wheezing. This finding suggests chronic airflow limitation."
+      : a.prediction.toLowerCase() === "pneumonia"
+      ? "The audio analysis detected patterns consistent with pneumonia, which typically presents with crackles (rales) — discontinuous popping sounds caused by fluid or secretions in the small airways and alveoli."
+      : a.prediction.toLowerCase() === "bronchial"
+      ? "The audio analysis detected patterns consistent with bronchitis, which may present with rhonchi (low-pitched continuous sounds) due to mucus in the larger airways."
+      : a.prediction.toLowerCase() === "healthy"
+      ? "The audio analysis detected normal respiratory sounds with no significant abnormalities. This suggests healthy airway function with no evidence of obstruction, fluid, or inflammation."
+      : `The audio analysis detected patterns classified as ${a.prediction}.`
+    : "No audio analysis was performed. Please complete the Audio Analysis module to obtain a CNN-based respiratory sound classification.";
+
+  const audioConfidence = a.confidence
+    ? ` The CNN model reported this prediction with ${Math.round(a.confidence * 100)}% confidence.`
+    : "";
+
+  // Asthma interpretation
+  const asthmaInterp = ast.prediction
+    ? ast.prediction === "Asthma Detected"
+      ? `The clinical asthma assessment model predicted "Asthma Detected"${ast.confidence ? ` with ${ast.confidence}% confidence` : ""}. This prediction is driven by the patient's clinical features: FEV1 of ${fev1}${p.familyHistory === 1 ? ", positive family history of asthma" : ""}${p.allergyHistory === 1 ? ", presence of allergy history" : ""}${p.smoking === 2 ? ", current smoking status" : p.smoking === 1 ? ", former smoking history" : ""}, and reported symptoms${p.wheezing === 1 ? " including wheezing" : ""}${p.shortnessOfBreath === 1 ? ", shortness of breath" : ""}${p.chestTightness === 1 ? ", and chest tightness" : ""}.`
+      : `The clinical asthma assessment model predicted "No Asthma Detected"${ast.confidence ? ` with ${ast.confidence}% confidence` : ""}. This suggests the patient's clinical features do not strongly indicate asthma at this time.`
+    : "No clinical asthma assessment was performed. Please complete the Asthma Detection module to obtain a LightGBM-based risk prediction.";
+
+  // Environmental interpretation
+  const envInterp = e.aqi
+    ? `The environmental monitoring data for ${location} shows an AQI of ${aqi} (US EPA Index: ${epaIdx}), PM2.5 of ${pm25} µg/m³, weather conditions of "${weather}", temperature ${temp}, humidity ${humidity}, and wind speed ${wind}. ${(e.epaIndex ?? 1) <= 1 ? "Air quality is good and unlikely to worsen respiratory symptoms." : (e.epaIndex ?? 1) <= 3 ? "Air quality is moderate; sensitive groups should limit prolonged outdoor exertion." : "Air quality is poor; asthma patients should stay indoors and use inhalers as needed."}`
+    : "No environmental data was collected. Please complete the Safe Check module to obtain real-time air quality and weather data.";
+
+  // Cross-module correlation
+  const audioSuggestsAsthma = a.prediction?.toLowerCase() === "asthma";
+  const clinicalSuggestsAsthma = ast.prediction === "Asthma Detected";
+  const bothSuggestAsthma = audioSuggestsAsthma && clinicalSuggestsAsthma;
+  const modulesAgree = audioSuggestsAsthma === clinicalSuggestsAsthma;
+
+  const correlation = bothSuggestAsthma
+    ? "The audio analysis and clinical asthma assessment CONVERGE on an asthma diagnosis. The CNN model detected respiratory sounds consistent with asthma, and the LightGBM clinical model independently predicted asthma based on the patient's questionnaire responses. This convergence significantly increases diagnostic confidence."
+    : !modulesAgree && a.prediction && ast.prediction
+    ? "The audio analysis and clinical asthma assessment DIVERGE. The audio model detected patterns consistent with " + a.prediction + ", while the clinical model predicted " + ast.prediction + ". This discrepancy should be investigated clinically — it may indicate a mixed condition, atypical presentation, or limitation in one of the models."
+    : "Cross-module correlation is limited because not all assessments were completed. The available findings should be interpreted with caution and supplemented with clinical evaluation.";
+
+  // Differential diagnosis based on audio prediction
+  const diffDiagnosis = [
+    { condition: "Asthma", reason: audioSuggestsAsthma || clinicalSuggestsAsthma ? "Audio/clinical findings support" : "Not suggested by current data", likelihood: audioSuggestsAsthma || clinicalSuggestsAsthma ? "More likely" : "Less likely" },
+    { condition: "COPD", reason: a.prediction?.toLowerCase() === "copd" ? "Audio detected COPD patterns" : p.smoking ? "Smoking history is a risk factor" : "Not suggested", likelihood: a.prediction?.toLowerCase() === "copd" ? "More likely" : "Less likely" },
+    { condition: "Bronchitis", reason: a.prediction?.toLowerCase() === "bronchial" ? "Audio detected bronchial patterns" : "Cough/sputum not assessed", likelihood: a.prediction?.toLowerCase() === "bronchial" ? "More likely" : "Less likely" },
+    { condition: "Pneumonia", reason: a.prediction?.toLowerCase() === "pneumonia" ? "Audio detected pneumonia patterns" : "Fever/chest X-ray not assessed", likelihood: a.prediction?.toLowerCase() === "pneumonia" ? "More likely" : "Unlikely" },
+    { condition: "Healthy", reason: a.prediction?.toLowerCase() === "healthy" ? "Audio analysis normal" : "Abnormal findings present", likelihood: a.prediction?.toLowerCase() === "healthy" ? "More likely" : "Unlikely" },
+  ];
+
+  return `## Patient Summary
+
+This report presents a multimodal respiratory assessment for a ${age !== "N/A" ? age + "-year-old" : ""} ${gender !== "N/A" ? gender.toLowerCase() : "patient"} combining audio analysis, clinical asthma prediction, and environmental exposure data. ${bothSuggestAsthma ? "The findings converge on a likely asthma diagnosis." : "The findings are summarized below for clinical correlation."}
 
 | Parameter | Value |
 |-----------|-------|
-| Age | ${"N/A"} |
-| Gender | ${"N/A"} |
-| BMI | ${"N/A"} |
-| Smoking Status | ${"N/A"} |
-| Family History | ${"N/A"} |
-| Allergies | ${"N/A"} |
-| Audio Prediction | ${"N/A"} |
-| Asthma Prediction | ${"N/A"} |
-| FEV1 | ${"N/A"} |
-| AQI | ${"N/A"} |
-| PM2.5 | ${"N/A"} |
-| Weather | ${"N/A"} |
-
-*Note: The patient-specific values above were not populated because the AI service was unavailable. Please refer to the other assessment tabs for the actual data.*
+| Age | ${age} |
+| Gender | ${gender} |
+| BMI | ${bmi} |
+| Smoking Status | ${smoking} |
+| Family History | ${familyHistory} |
+| Allergies | ${allergies} |
+| Audio Prediction | ${audioPred} |
+| Asthma Prediction | ${asthmaPred} |
+| FEV1 | ${fev1} |
+| AQI | ${aqi} |
+| PM2.5 | ${pm25} |
+| Weather | ${weather} |
 
 ## Audio Analysis Interpretation
 
-The audio respiratory analysis could not be interpreted in detail at this time. Please refer to the Audio Analysis tab for the CNN model's prediction and confidence score. A qualified clinician should review the original audio recording to confirm the presence of abnormal respiratory sounds such as wheezing, crackles, or decreased breath sounds.
+${audioInterp}${audioConfidence} The audio-based CNN model analyzes extracted features including zero-crossing rate, chroma STFT, MFCC coefficients, RMS energy, and mel spectrogram characteristics to classify the respiratory sound into one of five categories: Bronchial, Asthma, COPD, Healthy, or Pneumonia.
+
+It is important to note that audio analysis alone has limitations — the model's prediction depends on recording quality, duration, and the presence of characteristic sounds. A single 2.5-second clip may not capture the full clinical picture. These findings should be correlated with the clinical assessment and environmental data below.
 
 ## Clinical Asthma Assessment
 
-The clinical asthma assessment could not be interpreted in detail at this time. Please refer to the Asthma Detection tab for the LightGBM model's prediction. The clinical questionnaire captures key variables including FEV1, family history, allergy history, smoking status, BMI, and respiratory symptoms (wheezing, shortness of breath, chest tightness), each of which contributes to the model's prediction.
+${asthmaInterp} The LightGBM model evaluates 10 clinical features (age, gender, BMI, smoking status, family history, allergy history, FEV1, wheezing, shortness of breath, and chest tightness) to predict asthma risk. ${p.lungFunctionFeV1 ? `An FEV1 of ${fev1} ${p.lungFunctionFeV1 < 80 ? "is below the normal range (80-120%), suggesting airflow obstruction" : "is within or above the normal range (80-120%), suggesting normal pulmonary function"}.` : ""} ${p.familyHistory === 1 ? "The positive family history increases the genetic predisposition to asthma." : ""} ${p.allergyHistory === 1 ? "The presence of allergies is a known comorbidity associated with asthma." : ""} ${p.smoking === 2 ? "Current smoking status is a significant risk factor that can worsen asthma symptoms and reduce treatment effectiveness." : ""}
 
 ## Environmental Risk Analysis
 
-The environmental risk analysis could not be interpreted in detail at this time. Please refer to the Safe Check tab for the current AQI, PM2.5, weather conditions, and weather triggers. Elevated PM2.5 and poor AQI are known triggers for asthma exacerbations, particularly in children and elderly patients.
+${envInterp} Elevated PM2.5 levels (above 25 µg/m³) can penetrate deep into the lungs and trigger airway inflammation, particularly affecting asthma and COPD patients. Children and elderly individuals are especially vulnerable to poor air quality — children have developing respiratory systems, and elderly patients may have reduced physiological reserve. Practical recommendations include monitoring local AQI, limiting outdoor activity during poor air quality days, and using air purifiers indoors.
 
 ## Cross-Module Correlation
 
-Cross-module correlation could not be performed automatically. The convergence of audio findings, clinical assessment, and environmental data typically strengthens diagnostic confidence. If the modules disagree, the discrepancy should be investigated clinically rather than resolved by majority vote.
+${correlation} ${e.pm25 && e.pm25 > 25 ? `The environmental data shows elevated PM2.5 (${pm25} µg/m³), which may exacerbate respiratory symptoms and should be considered as a contributing environmental factor.` : "The environmental data does not show significantly elevated pollution levels."} ${p.allergyHistory === 1 && audioSuggestsAsthma ? "The patient's allergy history further supports the asthma hypothesis, as allergic conditions are closely linked to asthma pathophysiology." : ""}
 
 ## Supporting Findings
 
 | Finding | Evidence | Interpretation |
 |---------|----------|----------------|
-| Audio | See Audio Analysis tab | Requires clinical correlation |
-| Clinical | See Asthma Detection tab | Requires clinical correlation |
-| Environmental | See Safe Check tab | Requires clinical correlation |
+| Audio Analysis | ${audioPred}${a.confidence ? ` (${Math.round(a.confidence * 100)}%)` : ""} | ${a.prediction ? a.prediction.toLowerCase() === "healthy" ? "Normal respiratory sounds" : "Abnormal respiratory pattern detected" : "Not assessed"} |
+| Clinical Asthma | ${asthmaPred}${ast.confidence ? ` (${ast.confidence}%)` : ""} | ${asthmaPred === "Asthma Detected" ? "Supports airway obstruction" : "Does not support asthma"} |
+| FEV1 | ${fev1} | ${p.lungFunctionFeV1 ? (p.lungFunctionFeV1 < 80 ? "Reduced pulmonary function" : "Normal pulmonary function") : "Not assessed"} |
+| Allergy History | ${allergies} | ${p.allergyHistory === 1 ? "Increases asthma risk" : "No allergic predisposition"} |
+| Family History | ${familyHistory} | ${p.familyHistory === 1 ? "Genetic predisposition" : "No family history"} |
+| AQI | EPA ${epaIdx} | ${pollutionRisk === "High" ? "Poor environmental exposure" : pollutionRisk === "Moderate" ? "Moderate environmental exposure" : "Good air quality"} |
+| PM2.5 | ${pm25} µg/m³ | ${e.pm25 && e.pm25 > 25 ? "Elevated particulate matter" : "Within acceptable range"} |
 
 ## Risk Factor Analysis
 
 | Risk Factor | Level | Explanation |
 |-------------|-------|-------------|
-| Smoking | Unknown | Requires patient data |
-| Family history | Unknown | Requires patient data |
-| Air pollution | Unknown | Requires environmental data |
-| BMI | Unknown | Requires patient data |
-| Allergies | Unknown | Requires patient data |
-| Environment | Unknown | Requires environmental data |
+| Smoking | ${smokingRisk} | ${p.smoking === 2 ? "Current smoker — significantly increases respiratory risk" : p.smoking === 1 ? "Former smoker — elevated risk" : p.smoking === 0 ? "Non-smoker — low risk" : "Not assessed"} |
+| Family History | ${familyRisk} | ${p.familyHistory === 1 ? "Positive family history of asthma" : p.familyHistory === 0 ? "No family history" : "Not assessed"} |
+| Air Pollution | ${pollutionRisk} | ${e.epaIndex ? `EPA Index ${epaIdx}` : "Not assessed"} |
+| BMI | ${bmiRisk} | ${p.bmi ? (p.bmi >= 30 ? "Obese — increases asthma severity" : p.bmi >= 25 ? "Overweight — moderate risk" : "Normal weight") : "Not assessed"} |
+| Allergies | ${allergyRisk} | ${p.allergyHistory === 1 ? "Allergy history present" : p.allergyHistory === 0 ? "No known allergies" : "Not assessed"} |
+| Environment | ${envRisk} | ${e.aqi ? `AQI ${aqi} at ${location}` : "Not assessed"} |
 
 ## Differential Diagnosis
 
 | Possible Condition | Reason | Likelihood |
 |--------------------|--------|------------|
-| Asthma | Requires clinical correlation | Underdetermined |
-| COPD | Requires clinical correlation | Underdetermined |
-| Bronchitis | Requires clinical correlation | Underdetermined |
-| Pneumonia | Requires clinical correlation | Underdetermined |
-| Healthy | Requires clinical correlation | Underdetermined |
+${diffDiagnosis.map(d => `| ${d.condition} | ${d.reason} | ${d.likelihood} |`).join("\n")}
 
 ## Recommendations
 
 ### Lifestyle
-- Maintain a healthy lifestyle with regular physical activity as tolerated
-- Avoid known respiratory triggers including smoke, dust, and allergens
+${p.smoking === 2 ? "- **Quit smoking immediately** — this is the single most impactful lifestyle change for respiratory health\n- Avoid exposure to secondhand smoke" : "- Maintain a healthy lifestyle with regular physical activity as tolerated"}
+${p.bmi && p.bmi >= 25 ? "- Work toward a healthy weight through diet and exercise" : "- Maintain current healthy weight"}
+- Stay hydrated and practice diaphragmatic breathing exercises
 
 ### Medical
 - Consult a pulmonologist or primary care physician for a comprehensive evaluation
 - Bring all assessment results from this application to your appointment
+${asthmaPred === "Asthma Detected" ? "- Discuss potential bronchodilator therapy and inhaled corticosteroids" : "- Discuss routine respiratory health monitoring"}
+- Consider pulmonary function testing (spirometry) for definitive diagnosis
 
 ### Environmental
-- Monitor local air quality reports and limit outdoor activity during poor AQI days
-- Use air purifiers indoors if PM2.5 levels are elevated
+${pollutionRisk !== "Low" ? "- Monitor local air quality reports and limit outdoor activity during poor AQI days" : "- Air quality is currently good; no special precautions needed"}
+${e.pm25 && e.pm25 > 25 ? "- Use HEPA air purifiers indoors to reduce PM2.5 exposure" : "- Maintain good indoor air ventilation"}
+${p.allergyHistory === 1 ? "- Identify and avoid known allergens (dust, pollen, pet dander)" : ""}
 
 ### Monitoring
 - Keep a symptom diary tracking wheezing, shortness of breath, and chest tightness
 - Monitor peak flow readings regularly if you have a peak flow meter
+- Track environmental conditions alongside symptoms to identify triggers
 
 ### Follow-up
 - Schedule a follow-up with a healthcare provider within 1-2 weeks
 - Report any worsening symptoms promptly
+- Re-run this assessment if symptoms change
 
 ### Emergency Warning Signs
 - Seek immediate medical attention for severe shortness of breath, blue lips/fingernails, or inability to speak full sentences
-- Call emergency services if symptoms worsen rapidly
+- Call emergency services if symptoms worsen rapidly or if rescue inhaler provides no relief
+- Go to the emergency room for chest pain or confusion/altered consciousness
 
 ## Limitations
 
-This report is AI-assisted and does **not** constitute a medical diagnosis. It is intended for informational and educational purposes only. All predictions require confirmation by a qualified physician. The audio analysis depends on the quality and duration of the uploaded recording. Environmental data reflects the nearest monitoring station and may not represent the patient's exact exposure. The AI service was unavailable during this generation, so the narrative sections are limited — please re-run the assessment when the service is available.
+This report is AI-assisted and does **not** constitute a medical diagnosis. It is intended for educational and informational purposes only. All predictions require confirmation by a qualified physician. The audio analysis depends on the quality and duration of the uploaded recording. Environmental data reflects the nearest monitoring station and may not represent the patient's exact exposure. The clinical asthma model is a screening tool, not a diagnostic instrument.
+
+${reason ? `> **Note:** ${reason} The structured report above was generated from the actual patient assessment data.` : ""}
 
 ## Overall Clinical Impression
 
-This AI-assisted clinical decision support report combines multimodal respiratory assessment data including audio-based disease prediction, questionnaire-based asthma risk assessment, and real-time environmental exposure analysis. Due to a temporary limitation with the AI generation service, a detailed narrative impression could not be produced at this time. The structured data tables and recommendations above remain available for physician review.
+This ${age !== "N/A" ? age + "-year-old " : ""}${gender !== "N/A" ? gender.toLowerCase() + " " : ""}patient underwent a multimodal respiratory assessment comprising audio-based disease prediction, questionnaire-based asthma risk assessment, and environmental exposure analysis. ${audioPred !== "N/A" ? `The audio analysis identified patterns consistent with ${audioPred}${a.confidence ? ` at ${Math.round(a.confidence * 100)}% confidence` : ""}.` : "Audio analysis was not completed."} ${asthmaPred !== "N/A" ? `The clinical asthma assessment ${asthmaPred === "Asthma Detected" ? "predicted asthma" : "did not detect asthma"}${ast.confidence ? ` at ${ast.confidence}% confidence` : ""}.` : "Clinical asthma assessment was not completed."} ${e.aqi ? `Environmental monitoring at ${location} showed AQI ${aqi} (EPA Index ${epaIdx}) and PM2.5 of ${pm25} µg/m³.` : "Environmental data was not collected."}
 
-The patient should consult with a qualified healthcare provider for a comprehensive clinical evaluation. All findings presented in this report should be interpreted in conjunction with a complete medical history, physical examination, and appropriate diagnostic testing. This report is not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of a qualified healthcare provider with any questions regarding a medical condition.`;
+${bothSuggestAsthma ? "The convergence of audio and clinical findings toward an asthma diagnosis, combined with the patient's risk factor profile, suggests that respiratory symptoms may be associated with underlying asthma. However, this must be confirmed through formal pulmonary function testing and clinical evaluation by a qualified physician." : modulesAgree ? "The available assessment data does not strongly suggest an acute respiratory condition, but routine monitoring and follow-up are recommended." : "The divergence between audio and clinical findings warrants further investigation. A mixed or atypical presentation should be considered, and additional diagnostic workup including spirometry, imaging, and laboratory tests may be indicated."}
+
+${pollutionRisk === "High" ? "The poor environmental air quality is a significant contributing factor that may exacerbate respiratory symptoms. Environmental modifications and exposure reduction are recommended alongside medical management." : pollutionRisk === "Moderate" ? "Moderate environmental air quality may contribute to respiratory symptoms in sensitive individuals. Standard precautions are advised." : "Current environmental conditions are favorable and unlikely to contribute to respiratory symptoms."}
+
+**Recommended next steps:** The patient should consult with a pulmonologist for comprehensive evaluation, including spirometry and consideration of bronchodilator trial if clinically indicated. All findings from this multimodal assessment should be reviewed in conjunction with a complete medical history and physical examination. This report is not a substitute for professional medical advice, diagnosis, or treatment.`;
+}
 
 export async function POST(request: NextRequest) {
   let body: VerdictBody;
@@ -270,24 +381,33 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Debug logging (Task 3 & 6): log the exact payload received
+  const p = body.patientData || {};
+  const a = body.audioAnalysis || {};
+  const ast = body.asthmaAssessment || {};
+  const e = body.environmentalData || {};
+  console.log("[/api/generate-ai-verdict] Received payload:", {
+    patientData: { age: p.age, gender: p.gender, bmi: p.bmi, smoking: p.smoking, familyHistory: p.familyHistory, allergyHistory: p.allergyHistory, fev1: p.lungFunctionFeV1, wheezing: p.wheezing, sob: p.shortnessOfBreath, chest: p.chestTightness },
+    audio: { prediction: a.prediction, confidence: a.confidence, filename: a.filename },
+    asthma: { prediction: ast.prediction, confidence: ast.confidence },
+    env: { location: e.resolvedLocation?.name, aqi: e.aqi, pm25: e.pm25, epa: e.epaIndex, weather: e.weatherDescription },
+  });
+
   const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) {
-    console.warn(
-      "[/api/generate-ai-verdict] GOOGLE_API_KEY is not set — returning fallback verdict."
-    );
+    console.warn("[/api/generate-ai-verdict] GOOGLE_API_KEY not set — using dynamic fallback.");
     return NextResponse.json({
       success: true,
-      verdict: FALLBACK_VERDICT,
+      verdict: buildDynamicFallback(body, "GOOGLE_API_KEY is not configured."),
       source: "fallback",
       error: "GOOGLE_API_KEY not configured",
     });
   }
 
   const prompt = buildPrompt(body);
+  console.log("[/api/generate-ai-verdict] Prompt length:", prompt.length, "chars");
+  console.log("[/api/generate-ai-verdict] Prompt preview (first 300 chars):", prompt.slice(0, 300));
 
-  // Call the Gemini REST API directly via fetch (no SDK) — this is the most
-  // reliable approach for serverless runtimes (Vercel) and avoids any
-  // SDK-level process-crash issues.
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 28000);
@@ -310,44 +430,64 @@ export async function POST(request: NextRequest) {
 
     if (!res.ok) {
       const errText = await res.text();
-      console.error(
-        `[/api/generate-ai-verdict] Gemini API ${res.status}:`,
-        errText.slice(0, 200)
-      );
+      let errObj: { error?: { code?: number; message?: string; status?: string } } = {};
+      try { errObj = JSON.parse(errText); } catch { /* not JSON */ }
+      const errMsg = errObj.error?.message || errText.slice(0, 200);
+      const errCode = errObj.error?.code || res.status;
+      console.error(`[/api/generate-ai-verdict] Gemini API error ${errCode}:`, errMsg);
+
+      // Task 5: Return a descriptive error (not a silent fallback)
       return NextResponse.json({
         success: true,
-        verdict: FALLBACK_VERDICT,
+        verdict: buildDynamicFallback(body, `Gemini API returned ${errCode}: ${errMsg}`),
         source: "fallback",
-        error: `Gemini API ${res.status}: ${errText.slice(0, 120)}`,
+        error: `Gemini API ${errCode}: ${errMsg}`,
       });
     }
 
     const data = await res.json();
+    console.log("[/api/generate-ai-verdict] Gemini response keys:", Object.keys(data));
+    console.log("[/api/generate-ai-verdict] Usage:", data.usageMetadata);
+
     const verdict =
       data?.candidates?.[0]?.content?.parts
-        ?.map((p: { text?: string }) => p.text ?? "")
+        ?.map((part: { text?: string }) => part.text ?? "")
         .join("")
         .trim() ?? "";
+
+    console.log("[/api/generate-ai-verdict] Verdict length:", verdict.length, "chars");
 
     if (verdict) {
       return NextResponse.json({ success: true, verdict });
     }
 
+    // Gemini returned empty content (possibly blocked by safety filters)
+    const finishReason = data?.candidates?.[0]?.finishReason;
+    const blockReason = data?.promptFeedback?.blockReason;
+    const emptyReason = finishReason
+      ? `Gemini returned empty content (finishReason: ${finishReason})`
+      : blockReason
+      ? `Gemini blocked the request (blockReason: ${blockReason})`
+      : "Gemini returned an empty response";
+
     return NextResponse.json({
       success: true,
-      verdict: FALLBACK_VERDICT,
+      verdict: buildDynamicFallback(body, emptyReason),
       source: "fallback",
-      error: "Empty response from Gemini",
+      error: emptyReason,
     });
   } catch (err) {
-    console.error("[/api/generate-ai-verdict] error:", err);
-    const errMsg =
-      err instanceof Error ? err.message : String(err);
+    console.error("[/api/generate-ai-verdict] Fetch error:", err);
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const isTimeout = err instanceof Error && err.name === "AbortError";
+    const reason = isTimeout
+      ? "Gemini request timed out after 28 seconds"
+      : `Network error: ${errMsg}`;
     return NextResponse.json({
       success: true,
-      verdict: FALLBACK_VERDICT,
+      verdict: buildDynamicFallback(body, reason),
       source: "fallback",
-      error: errMsg,
+      error: reason,
     });
   }
 }

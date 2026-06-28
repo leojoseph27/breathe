@@ -59,6 +59,13 @@ export function AIDoctorView() {
         setReport(json.verdict);
         setReportSource(json.source || "gemini");
         setGeneratedAt(new Date().toISOString());
+        // If the API returned a fallback (Gemini unavailable), show the real
+        // error so the user knows WHY it fell back — not just "unavailable".
+        if (json.source === "fallback" && json.error) {
+          setError(json.error);
+        } else {
+          setError("");
+        }
       } else {
         setError(json.error || "Failed to generate AI report");
       }
