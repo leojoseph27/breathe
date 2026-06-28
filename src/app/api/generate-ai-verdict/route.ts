@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "crypto";
+import { db } from "@/lib/db";
+import {
+  getGeminiClient,
+  GEMINI_MODEL,
+  REPORT_GENERATION_CONFIG,
+  SYSTEM_INSTRUCTION,
+} from "@/lib/gemini";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface PatientData {
   age?: number;
@@ -47,6 +59,10 @@ interface VerdictBody {
   environmentalData?: EnvironmentalData;
 }
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 const yn = (v?: number) =>
   v === 1 ? "Yes" : v === 0 ? "No" : "N/A";
 const genderStr = (v?: number) =>
@@ -54,40 +70,10 @@ const genderStr = (v?: number) =>
 const smokeStr = (v?: number) =>
   v === 0 ? "Non-smoker" : v === 1 ? "Former smoker" : v === 2 ? "Current smoker" : "N/A";
 
-// Optimized system instruction — focused on clinical reasoning, NOT model
-// explanations. Targets 600-900 words to reduce latency and token usage.
-const SYSTEM_INSTRUCTION = `You are an AI clinical decision support assistant for respiratory medicine. Generate a concise, structured clinical report (600-900 words) from patient assessment data.
-
-Focus on CLINICAL REASONING — interpreting findings, correlating modules, discussing confidence, and recommending next steps. Do NOT explain how ML models work; the reader already knows the methodology.
-
-Be specific to THIS patient. Reference actual values. If modules agree, state the increased confidence. If they disagree, explain the discrepancy. Do not fabricate certainty.
-
-Return Markdown with these exact sections (## headings) in order:
-
-## Patient Summary
-2-3 sentence narrative + a markdown table (Parameter | Value) with: Age, Gender, BMI, Smoking, Family History, Allergies, Audio Prediction, Asthma Prediction, FEV1, AQI, PM2.5, Weather.
-
-## Clinical Findings
-One paragraph per finding: what the audio result means physiologically, what the asthma assessment indicates, and how environmental factors contribute. Keep each to 2-3 sentences. Do not explain model architecture.
-
-## Cross-Module Correlation
-The key section. Explain how audio, clinical, and environmental findings reinforce or contradict. State overall confidence. If findings converge, explain why. If they diverge, discuss the discrepancy honestly.
-
-## Risk & Differential Diagnosis
-A table (Condition | Likelihood | Reasoning) covering Asthma, COPD, Bronchitis, Pneumonia, Healthy. Then a table (Risk Factor | Level | Note) for Smoking, Family History, BMI, Allergies, Environment.
-
-## Recommendations
-Bullet lists under: Medical, Lifestyle, Environmental, Follow-up. Tailor to THIS patient's actual risk factors.
-
-## Limitations & Impression
-2-3 sentences on AI limitations, then a 100-150 word clinical impression summarizing the combined assessment and recommended next steps.`;
-
-const MODEL = "gemini-2.5-flash";
-const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
-
-// Optimized prompt — only sends data that contributes to clinical reasoning.
-// Removed: filename, PM10, NO2, SO2, pressure, cloud cover, precipitation
-// (these don't change clinical recommendations and waste tokens).
+/**
+ * Build the user prompt from the assessment data.
+ * Optimized — only sends data that contributes to clinical reasoning.
+ */
 function buildPrompt(b: VerdictBody): string {
   const p = b.patientData || {};
   const a = b.audioAnalysis || {};
@@ -107,68 +93,61 @@ Generate the full report now using the system instructions. Populate tables with
 }
 
 /**
- * Call Gemini with a timeout. Returns the verdict text or throws on error.
+ * Compute a stable hash of the assessment data for cache lookup.
+ * The cache is invalidated when ANY of the four data objects change.
+ */
+function computeDataHash(b: VerdictBody): string {
+  const canonical = JSON.stringify({
+    patientData: b.patientData || {},
+    audioAnalysis: b.audioAnalysis || {},
+    asthmaAssessment: b.asthmaAssessment || {},
+    environmentalData: b.environmentalData || {},
+  });
+  return createHash("sha256").update(canonical).digest("hex");
+}
+
+// ---------------------------------------------------------------------------
+// Gemini call via the official SDK
+// ---------------------------------------------------------------------------
+
+/**
+ * Call Gemini using the official @google/genai SDK with a lazy singleton
+ * client. Returns the generated text or throws on error.
  */
 async function callGemini(
-  apiKey: string,
   prompt: string,
   timeoutMs: number
 ): Promise<string> {
+  const client = getGeminiClient();
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const res = await fetch(`${API_ENDPOINT}?key=${encodeURIComponent(apiKey)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: controller.signal,
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 4096,
-        },
-      }),
+    const response = await client.models.generateContent({
+      model: GEMINI_MODEL,
+      contents: prompt,
+      config: {
+        ...REPORT_GENERATION_CONFIG,
+        systemInstruction: SYSTEM_INSTRUCTION,
+        abortSignal: controller.signal,
+      },
     });
 
-    clearTimeout(timeout);
-
-    if (!res.ok) {
-      const errText = await res.text();
-      let errObj: { error?: { code?: number; message?: string; status?: string } } = {};
-      try { errObj = JSON.parse(errText); } catch { /* not JSON */ }
-      const errMsg = errObj.error?.message || errText.slice(0, 200);
-      const errCode = errObj.error?.code || res.status;
-      throw new Error(`Gemini API ${errCode}: ${errMsg}`);
-    }
-
-    const data = await res.json();
-    const verdict =
-      data?.candidates?.[0]?.content?.parts
-        ?.map((part: { text?: string }) => part.text ?? "")
-        .join("")
-        .trim() ?? "";
-
-    if (!verdict) {
-      const finishReason = data?.candidates?.[0]?.finishReason;
-      const blockReason = data?.promptFeedback?.blockReason;
-      if (finishReason)
-        throw new Error(`Gemini returned empty content (finishReason: ${finishReason})`);
-      if (blockReason)
-        throw new Error(`Gemini blocked the request (blockReason: ${blockReason})`);
+    const text = response.text?.trim();
+    if (!text) {
       throw new Error("Gemini returned an empty response");
     }
-
-    return verdict;
+    return text;
   } finally {
     clearTimeout(timeout);
   }
 }
 
-/**
- * Build a DYNAMIC fallback report from the actual patient data.
- */
+// ---------------------------------------------------------------------------
+// Dynamic fallback (uses real patient data — zero N/A when data exists)
+// ---------------------------------------------------------------------------
+
 function buildDynamicFallback(b: VerdictBody, reason: string): string {
   const p = b.patientData || {};
   const a = b.audioAnalysis || {};
@@ -319,6 +298,42 @@ This report is AI-assisted, not a medical diagnosis. Predictions require physici
 ${reason ? `> **Note:** ${reason}` : ""}`;
 }
 
+// ---------------------------------------------------------------------------
+// Cache helpers
+// ---------------------------------------------------------------------------
+
+async function getCachedReport(hash: string) {
+  try {
+    return await db.clinicalReportCache.findUnique({
+      where: { dataHash: hash },
+    });
+  } catch (err) {
+    console.error("[/api/generate-ai-verdict] Cache read error:", err);
+    return null;
+  }
+}
+
+async function storeCachedReport(
+  hash: string,
+  verdict: string,
+  source: string
+) {
+  try {
+    await db.clinicalReportCache.upsert({
+      where: { dataHash: hash },
+      create: { dataHash: hash, verdict, source },
+      update: { verdict, source },
+    });
+  } catch (err) {
+    // Non-fatal — caching is an optimization, not a requirement
+    console.error("[/api/generate-ai-verdict] Cache write error:", err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// POST handler
+// ---------------------------------------------------------------------------
+
 export async function POST(request: NextRequest) {
   let body: VerdictBody;
   try {
@@ -330,55 +345,72 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const p = body.patientData || {};
-  const a = body.audioAnalysis || {};
-  const ast = body.asthmaAssessment || {};
-  const e = body.environmentalData || {};
-  console.log("[/api/generate-ai-verdict] Payload:", {
-    age: p.age, audio: a.prediction, asthma: ast.prediction, aqi: e.aqi,
-  });
+  const dataHash = computeDataHash(body);
+  console.log("[/api/generate-ai-verdict] Data hash:", dataHash.slice(0, 16));
 
+  // 1. Check cache first — if hit, return immediately (no Gemini call)
+  const cached = await getCachedReport(dataHash);
+  if (cached) {
+    console.log("[/api/generate-ai-verdict] Cache HIT — returning cached report");
+    return NextResponse.json({
+      success: true,
+      verdict: cached.verdict,
+      source: cached.source,
+      cached: true,
+    });
+  }
+
+  console.log("[/api/generate-ai-verdict] Cache MISS — calling Gemini");
+
+  // 2. Check API key
   const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) {
     console.warn("[/api/generate-ai-verdict] GOOGLE_API_KEY not set");
+    const fallback = buildDynamicFallback(body, "GOOGLE_API_KEY is not configured.");
+    await storeCachedReport(dataHash, fallback, "fallback");
     return NextResponse.json({
       success: true,
-      verdict: buildDynamicFallback(body, "GOOGLE_API_KEY is not configured."),
+      verdict: fallback,
       source: "fallback",
       error: "GOOGLE_API_KEY not configured",
     });
   }
 
+  // 3. Call Gemini with retry logic (2 attempts, 60s each)
   const prompt = buildPrompt(body);
-  console.log("[/api/generate-ai-verdict] Prompt length:", prompt.length, "chars");
-
-  // Retry logic: first attempt 60s, retry 60s. Only fall back after both fail.
   const ATTEMPTS = 2;
   const TIMEOUT_MS = 60000;
   let lastError = "";
 
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
     try {
-      console.log(`[/api/generate-ai-verdict] Attempt ${attempt}/${ATTEMPTS} (timeout ${TIMEOUT_MS}ms)`);
-      const verdict = await callGemini(apiKey, prompt, TIMEOUT_MS);
-      console.log(`[/api/generate-ai-verdict] Success on attempt ${attempt}. Verdict: ${verdict.length} chars, ${verdict.split(/\s+/).length} words`);
-      return NextResponse.json({ success: true, verdict });
+      console.log(`[/api/generate-ai-verdict] Attempt ${attempt}/${ATTEMPTS}`);
+      const verdict = await callGemini(prompt, TIMEOUT_MS);
+      console.log(`[/api/generate-ai-verdict] Success on attempt ${attempt}. ${verdict.length} chars, ${verdict.split(/\s+/).length} words`);
+
+      // Cache the successful Gemini response
+      await storeCachedReport(dataHash, verdict, "gemini");
+
+      return NextResponse.json({ success: true, verdict, source: "gemini" });
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
       const isTimeout = err instanceof Error && err.name === "AbortError";
       console.error(`[/api/generate-ai-verdict] Attempt ${attempt} failed: ${isTimeout ? "timeout" : lastError.slice(0, 120)}`);
       if (attempt < ATTEMPTS) {
         console.log("[/api/generate-ai-verdict] Retrying in 2s...");
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise((r) => setTimeout(r, 2000));
       }
     }
   }
 
-  // Both attempts failed — return dynamic fallback with real data
+  // 4. All attempts failed — return dynamic fallback with real data
   console.error(`[/api/generate-ai-verdict] All ${ATTEMPTS} attempts failed. Returning dynamic fallback.`);
+  const fallback = buildDynamicFallback(body, `Gemini failed after ${ATTEMPTS} attempts: ${lastError}`);
+  await storeCachedReport(dataHash, fallback, "fallback");
+
   return NextResponse.json({
     success: true,
-    verdict: buildDynamicFallback(body, `Gemini failed after ${ATTEMPTS} attempts: ${lastError}`),
+    verdict: fallback,
     source: "fallback",
     error: lastError,
   });

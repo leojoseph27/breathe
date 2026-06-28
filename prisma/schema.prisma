@@ -47,3 +47,16 @@ model SampleAudio {
 
   @@index([category])
 }
+
+// Clinical report cache — stores AI-generated reports keyed by a hash of the
+// assessment data. If the patient/audio/asthma/environmental data hasn't
+// changed, the cached report is returned instead of calling Gemini again.
+// This significantly reduces API usage and avoids quota exhaustion.
+model ClinicalReportCache {
+  id        String   @id @default(cuid())
+  dataHash  String   @unique // SHA-256 of the serialized assessment data
+  verdict   String   // full markdown report
+  source    String   // "gemini" | "fallback"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
