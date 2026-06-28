@@ -2,7 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  /* config options here */
+  // Prisma must be external so its native engine binary is loaded correctly
+  // in standalone/Docker deployments.
+  serverExternalPackages: ["@prisma/client"],
   typescript: {
     ignoreBuildErrors: true,
   },
