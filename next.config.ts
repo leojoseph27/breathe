@@ -12,7 +12,9 @@ const nextConfig: NextConfig = {
   // Clean, modern Permissions-Policy — only includes currently-supported
   // directives. Removes outdated features (ambient-light-sensor, battery,
   // document-domain, layout-animations, legacy-image-formats,
-  // oversized-images, vr, wake-lock) that trigger browser console warnings.
+  // oversized-images, vr, wake-lock, interest-cohort) that trigger browser
+  // console warnings. interest-cohort is part of the deprecated Privacy
+  // Sandbox and is removed to avoid version-specific warnings.
   async headers() {
     return [
       {
@@ -24,7 +26,6 @@ const nextConfig: NextConfig = {
               "camera=()",
               "microphone=()",
               "geolocation=(self)",
-              "interest-cohort=()",
             ].join(", "),
           },
         ],
